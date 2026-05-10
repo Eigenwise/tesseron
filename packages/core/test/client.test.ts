@@ -512,6 +512,62 @@ describe('TesseronClient end-to-end', () => {
     expect(w3.sessionId).toBe('sess-3');
   });
 
+  it('disconnect() during a pending chain step aborts the in-flight handshake (regression #88)', async () => {
+    // disconnect() previously only called `this.transport?.close()`. If
+    // the chain step was still awaiting `prior` or `priorClosed` when
+    // disconnect() fired, `this.transport` was undefined (doConnect
+    // hadn't run), so the close was a no-op and the handshake proceeded
+    // to attach a transport against the caller's intent. Now disconnect
+    // bumps `connectVersion`, so the pending step bails at its supersede
+    // check before it ever reaches doConnect.
+    const client = new TesseronClient();
+    client.app({ id: 'shop', name: 'Shop', origin: 'http://localhost' });
+
+    let helloFired = false;
+    let clientMessageHandler: ((m: unknown) => void) | undefined;
+    let clientCloseHandler: ((reason?: string) => void) | undefined;
+    const gateway = new JsonRpcDispatcher((m) => {
+      queueMicrotask(() => clientMessageHandler?.(m));
+    });
+    gateway.on('tesseron/hello', () => {
+      helloFired = true;
+      return {
+        sessionId: 'should-not-attach',
+        protocolVersion: PROTOCOL_VERSION,
+        capabilities: {
+          streaming: false,
+          subscriptions: false,
+          sampling: false,
+          elicitation: false,
+        },
+        agent: { id: 'a', name: 'a' },
+      };
+    });
+    const transport: Transport = {
+      send: (m) => queueMicrotask(() => gateway.receive(m)),
+      onMessage: (h) => {
+        clientMessageHandler = h;
+      },
+      onClose: (h) => {
+        clientCloseHandler = h;
+      },
+      close: () => clientCloseHandler?.('disconnected'),
+    };
+
+    // A first connect with no chain prior so its `await prior` is a
+    // no-op; the supersede yield inside the chain step is what we're
+    // exercising.
+    const c1 = client.connect(transport);
+    // disconnect immediately, before the IIFE has yielded back from
+    // its `await Promise.resolve()`. The version bump means c1's chain
+    // step throws TransportClosedError instead of proceeding to
+    // doConnect → sending hello.
+    await client.disconnect();
+    await expect(c1).rejects.toMatchObject({ name: 'TransportClosedError' });
+    // No hello reached the gateway — the handshake was actually aborted.
+    expect(helloFired).toBe(false);
+  });
+
   it('eager-closes a previously-settled connect on a fresh re-entry (HMR module re-execution)', async () => {
     // After a successful connect, the chain promise resolves and is
     // cleared. A subsequent connect (HMR re-running module-scope code,

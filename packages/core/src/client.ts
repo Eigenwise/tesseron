@@ -485,8 +485,19 @@ export class TesseronClient implements BuilderRegistry {
   /**
    * Closes the underlying transport. In-flight invocations are aborted and
    * active subscriptions are torn down via the transport's close handler.
+   *
+   * Also invalidates any pending {@link connect} chain step. Without that,
+   * a `disconnect()` called while a handshake is still mid-flight (chain
+   * step awaiting `prior`/`priorClosed`, `doConnect` not yet reached, so
+   * `this.transport` is still undefined) would silently do nothing — the
+   * in-flight `connect()` would proceed to attach a transport and complete
+   * the handshake despite the caller's intent to tear down. Bumping
+   * `connectVersion` causes the pending step to bail at its supersede
+   * check before it ever calls `doConnect`.
    */
   async disconnect(): Promise<void> {
+    this.connectVersion += 1;
+    this.connectChain = undefined;
     this.transport?.close();
   }
 
