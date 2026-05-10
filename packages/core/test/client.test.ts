@@ -297,6 +297,117 @@ describe('TesseronClient end-to-end', () => {
     ).rejects.toMatchObject({ code: TesseronErrorCode.Timeout });
   });
 
+  it('serializes connect() re-entry: prior is superseded, new handshake waits for drain (regression #88)', async () => {
+    // Regression for #88. Two re-entries used to race over `this.transport`:
+    // call 2 closed call 1's socket mid-handshake, frames in flight on either
+    // socket — including the gateway's `tesseron/resume` response — could be
+    // lost, and a claimed session ended up displaying a fresh claim code
+    // instead of resuming. The fix:
+    //   1. Eagerly closes the prior transport on re-entry so the prior
+    //      connect's pending hello/resume rejects via `TransportClosedError`
+    //      instead of hanging forever.
+    //   2. Awaits the prior connect's settlement AND the prior transport's
+    //      `onClose` drain before installing a new dispatcher and sending
+    //      the new handshake. Without the drain wait, a late-firing onClose
+    //      could trample the new dispatcher's state.
+    const client = new TesseronClient();
+    client.app({ id: 'shop', name: 'Shop', origin: 'http://localhost' });
+
+    type Pair = {
+      transport: Transport;
+      gateway: JsonRpcDispatcher;
+      sentHellos: number;
+      release: (welcome: unknown) => void;
+      closed: boolean;
+    };
+
+    const makePair = (sessionId: string): Pair => {
+      let release!: (welcome: unknown) => void;
+      const helloGate = new Promise<unknown>((r) => {
+        release = r;
+      });
+      const pair: Pair = {
+        transport: undefined as unknown as Transport,
+        gateway: undefined as unknown as JsonRpcDispatcher,
+        sentHellos: 0,
+        release,
+        closed: false,
+      };
+      let clientMessageHandler: ((m: unknown) => void) | undefined;
+      let clientCloseHandler: ((reason?: string) => void) | undefined;
+      const gateway = new JsonRpcDispatcher((m) => {
+        queueMicrotask(() => clientMessageHandler?.(m));
+      });
+      gateway.on('tesseron/hello', async () => {
+        pair.sentHellos += 1;
+        const w = await helloGate;
+        return w as {
+          sessionId: string;
+          protocolVersion: typeof PROTOCOL_VERSION;
+          capabilities: {
+            streaming: boolean;
+            subscriptions: boolean;
+            sampling: boolean;
+            elicitation: boolean;
+          };
+          agent: { id: string; name: string };
+        };
+      });
+      const transport: Transport = {
+        send: (m) => queueMicrotask(() => gateway.receive(m)),
+        onMessage: (h) => {
+          clientMessageHandler = h;
+        },
+        onClose: (h) => {
+          clientCloseHandler = h;
+        },
+        close: () => {
+          if (pair.closed) return;
+          pair.closed = true;
+          clientCloseHandler?.(`closed-${sessionId}`);
+        },
+      };
+      pair.transport = transport;
+      pair.gateway = gateway;
+      return pair;
+    };
+
+    const p1 = makePair('a');
+    const p2 = makePair('b');
+
+    const c1 = client.connect(p1.transport);
+    // First handshake reaches the gateway.
+    await new Promise((r) => setImmediate(r));
+    expect(p1.sentHellos).toBe(1);
+    expect(p1.closed).toBe(false);
+
+    // Second connect supersedes the first: closes p1 synchronously, fails
+    // c1 with TransportClosedError, queues the new handshake behind the
+    // drain. The new handshake's `tesseron/hello` only fires after p1's
+    // onClose has finished cleaning up — i.e., on the next microtask tick.
+    const c2 = client.connect(p2.transport);
+    expect(p1.closed).toBe(true);
+    await expect(c1).rejects.toMatchObject({ name: 'TransportClosedError' });
+
+    // After the chain unblocks, p2's hello reaches the (p2) gateway.
+    await new Promise((r) => setImmediate(r));
+    expect(p2.sentHellos).toBe(1);
+
+    p2.release({
+      sessionId: 'sess-2',
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: {
+        streaming: false,
+        subscriptions: false,
+        sampling: false,
+        elicitation: false,
+      },
+      agent: { id: 'b', name: 'b' },
+    });
+    const w2 = await c2;
+    expect(w2.sessionId).toBe('sess-2');
+  });
+
   it('frees the wire with -32001 Cancelled when actions/cancel arrives on a stuck handler', async () => {
     // Companion to the timeout case: actions/cancel from the agent must also
     // free the wire even when the handler doesn't observe ctx.signal.

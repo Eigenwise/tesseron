@@ -56,6 +56,10 @@ console.log('claim code:', welcome.claimCode);
 
 Browser apps need the [`@tesseron/vite`](/sdk/typescript/vite/) plugin in their `vite.config.ts` to serve `/@tesseron/ws`. Without it, `tesseron.connect()` will fail with a WebSocket error. If you use another dev server, pass a URL explicitly or build your own transport.
 
+### Re-entry safety
+
+`tesseron.connect()` is idempotent against re-entry. Two concurrent calls to the URL form with the same URL and the same `resume` credentials share a single in-flight promise (and a single WebSocket); the second caller does not open a parallel socket. This matters under React 18 StrictMode (mount → cleanup → remount), Vite HMR re-running module-scope `connect()`, and any flow that flips a connection-gating boolean rapidly. Without de-dup, the gateway would receive two `tesseron/resume` requests carrying the same single-shot token; the first would consume the zombie session and rotate, and the second would invariably fail with `ResumeFailed`. Connect-after-connect (a fresh call against an already-open transport) eagerly closes the prior socket, waits for its close handler to drain, and only then starts the new handshake — so dispatcher state never overlaps between the dying and the new transport.
+
 Returns `WelcomeResult`:
 
 ```ts

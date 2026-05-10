@@ -26,19 +26,69 @@ export const DEFAULT_GATEWAY_URL =
  * another gateway, or a custom {@link Transport} to bypass WebSocket entirely.
  * The optional second argument forwards {@link ConnectOptions} (e.g. session
  * resume) to the core client.
+ *
+ * **Re-entry safety.** Two URL-form `connect()` calls with the same URL and
+ * the same resume credentials (StrictMode mount → cleanup → remount, HMR
+ * re-running module-scope `connect()`, an `enabled` flag flapping under an
+ * auth gate) share a single in-flight promise and a single underlying
+ * WebSocket. Without this, both calls would build their own socket, the
+ * gateway would see two `tesseron/resume` requests sharing one (single-shot)
+ * resume token, and the second one would invariably fail with `ResumeFailed`.
+ * See tesseron#88. The transport-form (`connect(transport, options)`)
+ * bypasses URL-form de-dup and falls through to {@link TesseronClient.connect}'s
+ * serialization on top.
  */
 export class WebTesseronClient extends TesseronClient {
-  override async connect(
-    target?: Transport | string,
-    options?: ConnectOptions,
-  ): Promise<WelcomeResult> {
+  /**
+   * Tracks the most recent URL-form connect attempt so concurrent calls
+   * with matching options share its promise instead of opening a parallel
+   * WebSocket. Cleared once the promise settles.
+   */
+  private inFlightUrlConnect?: {
+    url: string;
+    resumeKey: string;
+    promise: Promise<WelcomeResult>;
+  };
+
+  override connect(target?: Transport | string, options?: ConnectOptions): Promise<WelcomeResult> {
     if (target && typeof target !== 'string') {
+      // Caller supplied their own transport — defer to core's
+      // serialization. URL-form de-dup doesn't apply because we have no
+      // safe way to assert the caller's transport is interchangeable with
+      // an in-flight one.
       return super.connect(target, options);
     }
-    const transport = new BrowserWebSocketTransport(target ?? DEFAULT_GATEWAY_URL);
-    await transport.ready();
-    return super.connect(transport, options);
+    const url = target ?? DEFAULT_GATEWAY_URL;
+    const resumeKey = resumeKeyOf(options?.resume);
+    const inFlight = this.inFlightUrlConnect;
+    if (inFlight && inFlight.url === url && inFlight.resumeKey === resumeKey) {
+      // Identity preserving: concurrent matching callers share THIS exact
+      // promise reference, not a wrapper. That lets adapters compare
+      // promises (`a === b`) to detect a deduped re-entry.
+      return inFlight.promise;
+    }
+    const promise = (async (): Promise<WelcomeResult> => {
+      const transport = new BrowserWebSocketTransport(url);
+      await transport.ready();
+      return super.connect(transport, options);
+    })();
+    const entry = { url, resumeKey, promise };
+    this.inFlightUrlConnect = entry;
+    promise
+      .catch(() => {})
+      .finally(() => {
+        if (this.inFlightUrlConnect === entry) this.inFlightUrlConnect = undefined;
+      });
+    return promise;
   }
+}
+
+function resumeKeyOf(resume: ConnectOptions['resume']): string {
+  // Stable, order-insensitive fingerprint of the resume credentials.
+  // `null`/`undefined` → empty string so two URL-form calls without a
+  // resume payload de-dup against each other.
+  if (!resume) return '';
+  return `${resume.sessionId}\x00${resume.resumeToken}`;
 }
 
 /**
