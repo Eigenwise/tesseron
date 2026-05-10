@@ -299,14 +299,6 @@ export function useTesseronConnection(
 
     const storage = resolveResumeStorage(resumeRef.current);
 
-    const connectOnce = async (options?: {
-      resume?: ResumeCredentials;
-    }): Promise<WelcomeResult> => {
-      // URL-form connect is the de-dup path on the singleton; same URL +
-      // same resume creds + concurrent → shared promise, single socket.
-      return client.connect(url, options);
-    };
-
     const run = async (): Promise<void> => {
       let saved: ResumeCredentials | null = null;
       if (storage) {
@@ -319,10 +311,14 @@ export function useTesseronConnection(
         }
       }
 
+      // URL-form `client.connect` is the de-dup path on the singleton:
+      // same URL + same resume creds + concurrent calls → shared promise,
+      // single socket. That's what fixes the StrictMode / HMR resume race
+      // (tesseron#88).
       let welcome: WelcomeResult;
       let resumeStatus: TesseronResumeStatus = 'none';
       try {
-        welcome = await connectOnce(saved ? { resume: saved } : undefined);
+        welcome = await client.connect(url, saved ? { resume: saved } : undefined);
         if (saved) resumeStatus = 'resumed';
       } catch (err) {
         if (saved && err instanceof TesseronError && err.code === TesseronErrorCode.ResumeFailed) {
@@ -338,7 +334,7 @@ export function useTesseronConnection(
             }
           }
           if (cancelled) return;
-          welcome = await connectOnce();
+          welcome = await client.connect(url);
           resumeStatus = 'failed';
         } else {
           throw err;

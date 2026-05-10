@@ -166,6 +166,13 @@ export class TesseronClient implements BuilderRegistry {
    * `connect()` to wait for full teardown before starting a fresh handshake.
    */
   private transportClosed?: Promise<void>;
+  /**
+   * Monotonic counter incremented on every `connect()` entry. Each chain
+   * step captures its own version and bails before {@link doConnect} if a
+   * later call has superseded it — so 3+ synchronous re-entries don't leak
+   * the middle transport (it's never attached). See tesseron#88.
+   */
+  private connectVersion = 0;
 
   /**
    * Sets the app identity included in the `tesseron/hello` handshake.
@@ -251,23 +258,27 @@ export class TesseronClient implements BuilderRegistry {
     if (!this.appConfig) {
       throw new Error('Tesseron: call app({ id, name }) before connect().');
     }
-    // Supersede the prior attempt eagerly. Closing the prior transport
-    // synchronously unblocks any pending `tesseron/hello`/`tesseron/resume`
-    // RPC (it rejects via `TransportClosedError` from `rejectAllPending`)
-    // so the prior connect promise unwinds without waiting on a peer
-    // response we no longer care about. Without the eager close, the
-    // chain below would `await prior` forever when the prior caller
-    // never aborted on its end.
-    const priorTransport = this.transport;
-    if (priorTransport && priorTransport !== transport) {
+    this.connectVersion += 1;
+    const myVersion = this.connectVersion;
+
+    // Sync supersede pass: close whichever transport is currently attached.
+    // The immediately-prior `connect()` may be hanging on a hello/resume
+    // the gateway will never reply to (dead socket, gateway shutdown,
+    // never-responding test fake) — closing the socket lets that connect's
+    // pending RPC reject via `TransportClosedError` and unblocks our
+    // `await prior` below. The chain step below ALSO closes after `await
+    // prior` resolves, to catch the case where the prior connect attached
+    // its transport during the microtask gap between our entry here and
+    // the chain step running.
+    const initialPrior = this.transport;
+    if (initialPrior && initialPrior !== transport) {
       try {
-        priorTransport.close();
+        initialPrior.close();
       } catch {
         // Transport may already be closing/closed; the onClose drain
         // still fires on its own.
       }
     }
-    const priorClosed = this.transportClosed;
 
     // Queue this connect after the prior one's settlement. Awaiting the
     // prior promise (success OR failure) plus its transport's onClose
@@ -279,6 +290,13 @@ export class TesseronClient implements BuilderRegistry {
     // invariably leave the second one with `ResumeFailed`.
     const prior = this.connectChain;
     const next = (async (): Promise<WelcomeResult> => {
+      // Yield to allow other synchronous `connect()` calls to increment
+      // `connectVersion` before we observe it. Without this yield, the
+      // first connect's IIFE runs straight through its version check
+      // (still version=1) and reaches `doConnect` before any subsequent
+      // call has had a chance to bump the counter — leaking transport
+      // attachments the supersede flow was supposed to prevent.
+      await Promise.resolve();
       if (prior) {
         try {
           await prior;
@@ -288,17 +306,39 @@ export class TesseronClient implements BuilderRegistry {
           // attempt. The failure is the prior caller's problem.
         }
       }
+      // If three-or-more connects landed synchronously, we're a middle
+      // member of the chain whose transport (`transport` arg) is no
+      // longer the one the caller wants live. Bail now — before
+      // `doConnect` attaches the transport — so it never opens a session
+      // the latest call would only have to tear down. The latest call's
+      // own chain step proceeds normally because its `myVersion` matches.
+      if (this.connectVersion !== myVersion) {
+        throw new TransportClosedError('superseded by a later connect()');
+      }
+      // Close anything attached during the prior connect's `doConnect`.
+      // The sync supersede pass above couldn't see this transport because
+      // `prior`'s `doConnect` ran in a microtask after our sync entry.
+      const queuedPrior = this.transport;
+      if (queuedPrior && queuedPrior !== transport) {
+        try {
+          queuedPrior.close();
+        } catch {
+          // Same as the sync close above — onClose drains regardless.
+        }
+      }
       // Wait for the prior transport's onClose handler to finish draining
       // dispatcher state before the new dispatcher is wired up — without
       // it, a late-firing onClose from the dying socket could trample
-      // the new handshake's state.
+      // the new handshake's state. `transportClosed` is constructed with
+      // a resolve-only Promise (no reject path), so no try/catch.
+      const priorClosed = this.transportClosed;
       if (priorClosed) {
-        try {
-          await priorClosed;
-        } catch {
-          // Transport drain promises don't reject in normal flow; the
-          // catch is defensive.
-        }
+        await priorClosed;
+      }
+      // Re-check supersession after the drain — a connect that landed
+      // while we were awaiting the drain still wins.
+      if (this.connectVersion !== myVersion) {
+        throw new TransportClosedError('superseded by a later connect()');
       }
       return this.doConnect(transport, options);
     })();

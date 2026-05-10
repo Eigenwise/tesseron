@@ -69,7 +69,21 @@ export class WebTesseronClient extends TesseronClient {
     }
     const promise = (async (): Promise<WelcomeResult> => {
       const transport = new BrowserWebSocketTransport(url);
-      await transport.ready();
+      try {
+        await transport.ready();
+      } catch (err) {
+        // ready() rejected — gateway unreachable, TLS handshake failed,
+        // or the socket closed before opening. Best-effort close so the
+        // underlying `WebSocket` is GC'able and we don't leak a half-open
+        // socket past the rejected connect promise. close() is a no-op
+        // if the WS already closed itself, which is the common case.
+        try {
+          transport.close();
+        } catch {
+          // Already in a bad state; nothing more to do.
+        }
+        throw err;
+      }
       return super.connect(transport, options);
     })();
     const entry = { url, resumeKey, promise };
