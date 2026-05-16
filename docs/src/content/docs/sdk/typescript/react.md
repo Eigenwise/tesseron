@@ -77,19 +77,20 @@ Only one component should call `useTesseronConnection` per client - it owns the 
 
 ### Surviving page refresh / HMR with `resume`
 
-By default, every page load of an app that uses `useTesseronConnection` starts a brand-new session, which means a brand-new claim code on every refresh. For most local-dev React apps that's exactly the wrong default - flip `resume: true` and the hook persists the `sessionId` / `resumeToken` from each handshake in `localStorage`, then sends `tesseron/resume` instead of `tesseron/hello` on the next page load. The agent stays paired across refreshes, HMR reloads, and brief network blips:
+Since `2.9.0`, **`resume` defaults to `true`** - the hook automatically persists `{ sessionId, resumeToken }` in `localStorage` and sends `tesseron/resume` on the next page load instead of `tesseron/hello`. The agent stays paired across refreshes, HMR reloads, and brief network blips with no extra code:
 
 ```tsx
-const conn = useTesseronConnection({ resume: true });
+const conn = useTesseronConnection(); // resume: true is the default
 ```
 
-The hook handles the backing protocol details for you - token rotation, the [`ResumeFailed`](/protocol/resume/) fallback to a fresh hello when the gateway zombie has expired, and clearing stale credentials. Inspect `conn.resumeStatus` to tell whether the current session was resumed (`'resumed'`), is a fallback after a rejected resume (`'failed'`), or was a plain hello (`'none'`). See [Session resume](/protocol/resume/) for the underlying primitives.
+The hook handles the backing protocol details for you - token rotation, the [`ResumeFailed`](/protocol/resume/) fallback to a fresh hello when the gateway zombie has expired (default TTL: 4 hours), and clearing stale credentials. Inspect `conn.resumeStatus` to tell whether the current session was resumed (`'resumed'`), is a fallback after a rejected resume (`'failed'`), or was a plain hello (`'none'`). See [Session resume](/protocol/resume/) for the underlying primitives.
 
-The `resume` option accepts three forms:
+The `resume` option accepts four forms:
 
 | Form | Behaviour |
 |---|---|
-| `true` | Persist in `localStorage` under `'tesseron:resume'`. |
+| `true` *(default)* | Persist in `localStorage` under `'tesseron:resume'`. |
+| `false` | No persistence. Every connect is a fresh hello with a new claim code. Use for incognito-style flows. |
 | `string` | Persist in `localStorage` under that exact key. Use a per-app value if you mount multiple `WebTesseronClient` instances on one page. |
 | `ResumeStorage` | Custom `{ load, save, clear }` callbacks (sync or async). Use this when `localStorage` is not available - Electron with strict CSP, an iframe partition, the OS keychain, etc. |
 

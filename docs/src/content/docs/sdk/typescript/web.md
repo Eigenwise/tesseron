@@ -23,6 +23,12 @@ import {
   // Served by the `@tesseron/vite` plugin. In a dev browser this resolves to e.g.
   // `ws://localhost:5173/@tesseron/ws` when the page is served from Vite on :5173.
   DEFAULT_GATEWAY_URL,
+  // Default localStorage key used for auto-persist resume credentials.
+  DEFAULT_RESUME_STORAGE_KEY,
+  // Persistence backend interface for custom resume storage.
+  type ResumeStorage,
+  // Extended ConnectOptions accepted by WebTesseronClient.connect.
+  type WebConnectOptions,
 } from '@tesseron/web';
 
 // The full `@tesseron/core` surface is also re-exported.
@@ -55,6 +61,38 @@ console.log('claim code:', welcome.claimCode);
 | `Transport` | Uses the supplied transport - mostly for tests. |
 
 Browser apps need the [`@tesseron/vite`](/sdk/typescript/vite/) plugin in their `vite.config.ts` to serve `/@tesseron/ws`. Without it, `tesseron.connect()` will fail with a WebSocket error. If you use another dev server, pass a URL explicitly or build your own transport.
+
+### Auto-persist resume
+
+The optional second argument is `WebConnectOptions`. Its `resume` field controls whether the SDK persists the session credentials across reloads:
+
+| `resume` value | Behaviour |
+|---|---|
+| omitted or `true` (default) | Persist `{ sessionId, resumeToken }` in `localStorage` under `tesseron:resume`. On the next `connect()` the SDK reads them, sends `tesseron/resume`, saves the rotated token. On `ResumeFailed` it clears storage and falls back to a fresh `tesseron/hello`. |
+| `false` | No persistence. Every connect is a fresh hello with a new claim code. |
+| `string` | Same as `true` but with this `localStorage` key. Useful when you run multiple Tesseron clients on one page. |
+| [`ResumeStorage`](#custom-resume-backend) | Custom backend - OS keychain, Electron store, IPC bridge, anything implementing the interface. |
+| [`ResumeCredentials`](/protocol/resume/) literal | Caller-managed creds. SDK uses them as-is and does **not** auto-persist. |
+
+The default keeps casual refreshes from costing the user a fresh claim code — the most common reason resume was hand-wired in apps before. See [protocol/resume](/protocol/resume/) for the gateway-side TTL semantics (default 4 hours, configurable via `TESSERON_RESUME_TTL_MS`).
+
+Transport-form `tesseron.connect(customTransport, ...)` only accepts `ResumeCredentials` or `false` for `resume`; the storage-aware shapes require the URL form (the SDK constructs and owns the transport so it can retry the handshake on `ResumeFailed`).
+
+#### Custom resume backend
+
+```ts
+import { tesseron, type ResumeStorage } from '@tesseron/web';
+
+const keychain: ResumeStorage = {
+  load: () => electronAPI.invoke('tesseron:load'),
+  save: (creds) => electronAPI.invoke('tesseron:save', creds),
+  clear: () => electronAPI.invoke('tesseron:clear'),
+};
+
+await tesseron.connect(undefined, { resume: keychain });
+```
+
+Throws inside `load`/`save`/`clear` are non-fatal: the SDK treats a thrown `load()` as no saved creds, and thrown `save()` / `clear()` as silent best-effort. Storage misbehaviour can't fail-close the connection.
 
 ### Re-entry safety
 

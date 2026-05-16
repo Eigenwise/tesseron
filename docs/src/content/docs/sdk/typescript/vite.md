@@ -16,11 +16,16 @@ Browsers can't bind TCP ports. The gateway needs a WebSocket endpoint to dial. T
 When a browser tab opens your dev URL, it dials `/@tesseron/ws` on the same origin. The plugin:
 
 1. Accepts the browser connection (no subprotocol).
-2. Writes `~/.tesseron/instances/<instanceId>.json` (a v2 manifest with `transport: { kind: 'ws', url }`) pointing at `/@tesseron/ws/<instanceId>` on your dev server.
-3. Waits for the gateway to dial the per-tab URL with the `tesseron-gateway` subprotocol.
-4. Bridges frames between the two sockets, buffering browser → gateway traffic if the browser starts talking before the gateway dials in. Text frames stay text, binary frames stay binary — the bridge preserves the frame type so the browser SDK isn't fed binary blobs that it would silently drop.
+2. Waits for the first JSON-RPC frame:
+   - `tesseron/hello` → creates a new **Session**: mints `claimCode`/`sessionId`/`resumeToken`, writes `~/.tesseron/instances/<instanceId>.json` (a v2 manifest with `helloHandledByHost: true` + `hostMintedClaim`), synthesizes the welcome locally so the SDK sees the claim code instantly.
+   - `tesseron/resume` → looks the sessionId up in the in-memory Session map; on a token match, re-attaches the new browser WS to the existing Session and synthesizes the resume response (rotated token, no claim code). On a miss, returns `ResumeFailed` so the SDK falls back to a fresh hello.
+3. Waits for the gateway to dial the per-tab URL with the `tesseron-gateway` + `tesseron-bind.<code>` subprotocols. On bind, replays the cached hello to the gateway and bridges frames in both directions, buffering browser → gateway traffic if the browser starts talking before the gateway dials in. Text frames stay text, binary frames stay binary — the bridge preserves the frame type so the browser SDK isn't fed binary blobs that it would silently drop.
 
-One tab → one instance manifest → one gateway connection → one Tesseron session. Multiple tabs coexist cleanly.
+### Sessions span browser refreshes
+
+A **Session** is keyed by `sessionId`, not by browser WebSocket. The browser WS can detach (refresh, tab close, network blip) and reattach via `tesseron/resume` without disturbing the gateway-side bridge — the agent keeps the same `sessionId` and stays paired without the user retyping the claim code. The plugin keeps the Session in memory across the detach window; if no resume arrives within `sessionIdleTtlMs` (default 4 hours), the Session is destroyed and the gateway-side WS closes.
+
+One tab → one Session → one manifest → one gateway connection. Multiple tabs coexist cleanly, each with its own Session.
 
 ## Install
 
@@ -60,13 +65,22 @@ export default defineConfig({
 
 ```ts
 tesseron({
-  appName: 'my-app',   // Optional. Written into the instance manifest so the
-                       // gateway log names your app usefully. Defaults to the
-                       // Vite project directory name.
+  appName: 'my-app',          // Optional. Written into the instance manifest so the
+                              // gateway log names your app usefully. Defaults to the
+                              // Vite project directory name.
+  sessionIdleTtlMs: 4 * 60 * 60 * 1000,
+                              // Optional. How long a Session is held in memory after
+                              // its browser WS detaches (refresh, tab close). A new
+                              // browser WS arriving within this window with a valid
+                              // `tesseron/resume` re-attaches to the same Session
+                              // and the gateway-side bridge sees no disconnect.
+                              // Default 4 h, matching @tesseron/mcp's resumeTtlMs.
+                              // Set 0 to tear down sessions immediately on browser
+                              // close (disables cross-refresh resume).
 });
 ```
 
-That's the whole API surface. There's nothing to configure about ports, paths, or subprotocols - those are wire-level details.
+That's the whole API surface — ports, paths, and subprotocols are wire-level details.
 
 ## How the browser reaches it
 
@@ -105,10 +119,12 @@ The Vite plugin is strictly for dev-time workflows.
 
 ## Writing your own bridge
 
-If you use a dev server other than Vite (webpack-dev-server, Rsbuild, Next.js dev, a custom Express-based HMR setup), the same three steps work:
+If you use a dev server other than Vite (webpack-dev-server, Rsbuild, Next.js dev, a custom Express-based HMR setup), the same pattern works:
 
-1. On WebSocket upgrade at `/@tesseron/ws` - accept the browser and assign an `instanceId`.
-2. Write `~/.tesseron/instances/<instanceId>.json` with `{ version: 2, instanceId, appName, addedAt, transport: { kind: 'ws', url } }`, where `url` points at a tab-specific path like `/@tesseron/ws/<instanceId>`.
-3. On WebSocket upgrade at that per-tab path with subprotocol `tesseron-gateway` - accept the gateway and relay frames between the two sockets. Preserve text/binary frame types when relaying; buffer browser traffic until the gateway arrives.
+1. On WebSocket upgrade at `/@tesseron/ws` — accept the browser. Defer minting until you see the first JSON-RPC frame.
+2. On `tesseron/hello`, allocate a Session (mint `claimCode`, `sessionId`, `resumeToken`), write `~/.tesseron/instances/<instanceId>.json` with `{ version: 2, instanceId, appName, addedAt, helloHandledByHost: true, hostMintedClaim: {...}, transport: { kind: 'ws', url } }` where `url` points at a tab-specific path like `/@tesseron/ws/<instanceId>`. Synthesize the welcome locally so the SDK sees the claim code immediately.
+3. On `tesseron/resume`, look up the sessionId in your in-memory Session map. On a token match, attach the new browser WS to the existing Session and synthesize the resume response (rotated token, no claim code); on a miss, return `ResumeFailed`.
+4. On WebSocket upgrade at the per-tab path with subprotocols `tesseron-gateway` + `tesseron-bind.<code>` — accept the gateway, validate the bind code in constant time, replay the cached hello, and relay frames between the two sockets. Preserve text/binary frame types.
+5. On browser-WS close, keep the Session alive for the idle TTL; on idle-TTL expiry or gateway-WS close, destroy the Session and delete the manifest.
 
 `@tesseron/vite`'s source is the reference; adapt it to whatever dev server you run.

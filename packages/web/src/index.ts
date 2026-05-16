@@ -1,6 +1,9 @@
 import {
   type ConnectOptions,
+  type ResumeCredentials,
   TesseronClient,
+  TesseronError,
+  TesseronErrorCode,
   type Transport,
   type WelcomeResult,
 } from '@tesseron/core';
@@ -21,11 +24,64 @@ export const DEFAULT_GATEWAY_URL =
     : 'ws://localhost:5173/@tesseron/ws';
 
 /**
+ * Persistence backend for resume credentials. Implementations may be sync or
+ * async; the SDK awaits each call. Returning `null` / `undefined` from `load`
+ * means "no stored session, do a fresh hello." Throws from any method are
+ * non-fatal: the SDK treats them like an empty backend (load) or a silent
+ * no-op (save/clear) so storage problems can't fail-close the connection.
+ */
+export interface ResumeStorage {
+  load: () => ResumeCredentials | null | undefined | Promise<ResumeCredentials | null | undefined>;
+  save: (credentials: ResumeCredentials) => void | Promise<void>;
+  clear: () => void | Promise<void>;
+}
+
+/** Default `localStorage` key used when {@link WebConnectOptions.resume} is omitted or `true`. */
+export const DEFAULT_RESUME_STORAGE_KEY = 'tesseron:resume';
+
+/**
+ * Options to {@link WebTesseronClient.connect}. Extends the protocol-level
+ * {@link ConnectOptions} with a richer `resume` shape that bundles persistence
+ * into the connect call so raw `@tesseron/web` users don't have to hand-wire
+ * the four-line localStorage recipe from the docs.
+ */
+export interface WebConnectOptions extends Omit<ConnectOptions, 'resume'> {
+  /**
+   * Controls session-resume behaviour on this connect.
+   *
+   * - `undefined` or `true` (default): persist `{ sessionId, resumeToken }`
+   *   in `localStorage` under {@link DEFAULT_RESUME_STORAGE_KEY}. The SDK
+   *   auto-loads on connect, sends `tesseron/resume` if credentials exist,
+   *   saves the rotated token on success, and transparently falls back to a
+   *   fresh `tesseron/hello` if the gateway rejects the resume (TTL elapsed,
+   *   token rotated by another tab, gateway restarted).
+   * - `false`: no persistence. Every connect is a fresh hello with a new
+   *   claim code. Use for incognito-style flows that must not carry session
+   *   state across page reloads.
+   * - `string`: same as `true`, but with this `localStorage` key. Pass a
+   *   per-app value when you run multiple Tesseron clients on one page.
+   * - {@link ResumeStorage}: custom persistence backend (an Electron store,
+   *   an OS keychain bridge, an IPC channel — anything implementing the
+   *   interface).
+   * - {@link ResumeCredentials}: explicit credentials the caller already
+   *   loaded from elsewhere. The SDK uses them as-is and does **not**
+   *   auto-persist; the caller is expected to handle storage itself. This
+   *   is the legacy form; new code should prefer one of the storage-aware
+   *   shapes above.
+   *
+   * `@tesseron/react`'s `useTesseronConnection` hook manages its own
+   * storage and passes results through explicitly — when using the hook,
+   * configure resume there, not here.
+   */
+  resume?: ResumeCredentials | boolean | string | ResumeStorage;
+}
+
+/**
  * Browser-side {@link TesseronClient} with a WebSocket-aware `connect` overload.
  * Pass nothing to use {@link DEFAULT_GATEWAY_URL}, a URL string to connect to
  * another gateway, or a custom {@link Transport} to bypass WebSocket entirely.
- * The optional second argument forwards {@link ConnectOptions} (e.g. session
- * resume) to the core client.
+ * The optional second argument is {@link WebConnectOptions} — see its `resume`
+ * field for how persistence is wired in by default.
  *
  * **Re-entry safety.** Two URL-form `connect()` calls with the same URL and
  * the same resume credentials (StrictMode mount → cleanup → remount, HMR
@@ -40,53 +96,56 @@ export const DEFAULT_GATEWAY_URL =
  */
 export class WebTesseronClient extends TesseronClient {
   /**
-   * Tracks the most recent URL-form connect attempt so concurrent calls
-   * with matching options share its promise instead of opening a parallel
+   * Tracks the most recent URL-form connect attempt so concurrent calls with
+   * matching dedup keys share its promise instead of opening a parallel
    * WebSocket. Cleared once the promise settles.
    */
   private inFlightUrlConnect?: {
     url: string;
-    resumeKey: string;
+    dedupKey: string;
     promise: Promise<WelcomeResult>;
   };
 
-  override connect(target?: Transport | string, options?: ConnectOptions): Promise<WelcomeResult> {
+  override connect(
+    target?: Transport | string,
+    options?: WebConnectOptions,
+  ): Promise<WelcomeResult> {
     if (target && typeof target !== 'string') {
-      // Caller supplied their own transport — defer to core's
-      // serialization. URL-form de-dup doesn't apply because we have no
-      // safe way to assert the caller's transport is interchangeable with
-      // an in-flight one.
-      return super.connect(target, options);
+      // Transport-form: the caller supplied their own transport. Auto-persist
+      // would have to round-trip through the SDK at connect time, which the
+      // caller hasn't asked for, so refuse the storage-aware shapes upfront
+      // rather than silently dropping them. ResumeCredentials and `false`
+      // remain valid here. Reject (don't throw) so the API stays
+      // promise-uniform — callers don't have to know which mistakes are
+      // synchronous vs asynchronous.
+      if (
+        options?.resume !== undefined &&
+        options.resume !== false &&
+        !isResumeCredentials(options.resume)
+      ) {
+        return Promise.reject(
+          new Error(
+            'tesseron.connect(transport, { resume }): persistence shapes (true/string/ResumeStorage) require the URL form. Pass ResumeCredentials directly or omit the option.',
+          ),
+        );
+      }
+      return super.connect(target, options as ConnectOptions);
     }
     const url = target ?? DEFAULT_GATEWAY_URL;
-    const resumeKey = resumeKeyOf(options?.resume);
+    const { storage, explicitCreds } = normalizeResume(options?.resume);
+    // Dedup key fingerprints the resume intent: explicit creds dedup on their
+    // literal value (preserves the pre-storage tesseron#88 contract), storage-
+    // backed connects dedup on a stable id of the storage option (two
+    // StrictMode mounts asking for `resume: true` share one connect), and
+    // `resume: false` dedups against itself but not against storage-backed
+    // calls.
+    const dedupKey = dedupKeyOf(options?.resume, storage, explicitCreds);
     const inFlight = this.inFlightUrlConnect;
-    if (inFlight && inFlight.url === url && inFlight.resumeKey === resumeKey) {
-      // Identity preserving: concurrent matching callers share THIS exact
-      // promise reference, not a wrapper. That lets adapters compare
-      // promises (`a === b`) to detect a deduped re-entry.
+    if (inFlight && inFlight.url === url && inFlight.dedupKey === dedupKey) {
       return inFlight.promise;
     }
-    const promise = (async (): Promise<WelcomeResult> => {
-      const transport = new BrowserWebSocketTransport(url);
-      try {
-        await transport.ready();
-      } catch (err) {
-        // ready() rejected — gateway unreachable, TLS handshake failed,
-        // or the socket closed before opening. Best-effort close so the
-        // underlying `WebSocket` is GC'able and we don't leak a half-open
-        // socket past the rejected connect promise. close() is a no-op
-        // if the WS already closed itself, which is the common case.
-        try {
-          transport.close();
-        } catch {
-          // Already in a bad state; nothing more to do.
-        }
-        throw err;
-      }
-      return super.connect(transport, options);
-    })();
-    const entry = { url, resumeKey, promise };
+    const promise = this.runUrlConnect(url, storage, explicitCreds);
+    const entry = { url, dedupKey, promise };
     this.inFlightUrlConnect = entry;
     promise
       .catch(() => {})
@@ -95,14 +154,191 @@ export class WebTesseronClient extends TesseronClient {
       });
     return promise;
   }
+
+  private async runUrlConnect(
+    url: string,
+    storage: ResumeStorage | null,
+    explicitCreds: ResumeCredentials | null,
+  ): Promise<WelcomeResult> {
+    let creds: ResumeCredentials | null = explicitCreds;
+    if (!creds && storage) {
+      try {
+        creds = (await storage.load()) ?? null;
+      } catch {
+        // A throwing backend shouldn't break the connection; treat as no
+        // saved creds and proceed to a fresh hello.
+        creds = null;
+      }
+    }
+    const welcome = await this.openSocketAndHandshake(url, creds, storage, explicitCreds);
+    if (storage && !explicitCreds && welcome.resumeToken) {
+      try {
+        await storage.save({
+          sessionId: welcome.sessionId,
+          resumeToken: welcome.resumeToken,
+        });
+      } catch {
+        // Persistence failure is non-fatal — the live session still works
+        // for this page load, it just won't survive the next refresh.
+      }
+    }
+    return welcome;
+  }
+
+  private async openSocketAndHandshake(
+    url: string,
+    creds: ResumeCredentials | null,
+    storage: ResumeStorage | null,
+    explicitCreds: ResumeCredentials | null,
+  ): Promise<WelcomeResult> {
+    const transport = new BrowserWebSocketTransport(url);
+    try {
+      await transport.ready();
+    } catch (err) {
+      // ready() rejected — gateway unreachable, TLS handshake failed, or the
+      // socket closed before opening. Best-effort close so the underlying
+      // WebSocket is GC'able and we don't leak a half-open socket past the
+      // rejected connect promise. close() is a no-op if the WS already
+      // closed itself, which is the common case.
+      try {
+        transport.close();
+      } catch {
+        // Already in a bad state; nothing more to do.
+      }
+      throw err;
+    }
+    try {
+      return await super.connect(transport, creds ? { resume: creds } : {});
+    } catch (err) {
+      // Auto-fallback only kicks in for SDK-managed storage. If the caller
+      // passed explicit creds they own the storage layer and the failure
+      // contract — let it through unchanged.
+      if (
+        storage &&
+        !explicitCreds &&
+        creds &&
+        err instanceof TesseronError &&
+        err.code === TesseronErrorCode.ResumeFailed
+      ) {
+        try {
+          await storage.clear();
+        } catch {
+          // Cleanup is non-fatal — the next successful save() overwrites
+          // the stale entry anyway.
+        }
+        // Open a fresh socket: the failed resume already closed the previous
+        // one, and re-using a dead transport would double-fault.
+        const retry = new BrowserWebSocketTransport(url);
+        try {
+          await retry.ready();
+        } catch (e) {
+          try {
+            retry.close();
+          } catch {
+            // see above
+          }
+          throw e;
+        }
+        return super.connect(retry, {});
+      }
+      throw err;
+    }
+  }
 }
 
-function resumeKeyOf(resume: ConnectOptions['resume']): string {
-  // Stable, order-insensitive fingerprint of the resume credentials.
-  // `null`/`undefined` → empty string so two URL-form calls without a
-  // resume payload de-dup against each other.
-  if (!resume) return '';
-  return `${resume.sessionId}\x00${resume.resumeToken}`;
+function isResumeCredentials(x: unknown): x is ResumeCredentials {
+  return (
+    typeof x === 'object' &&
+    x !== null &&
+    typeof (x as Record<string, unknown>)['sessionId'] === 'string' &&
+    typeof (x as Record<string, unknown>)['resumeToken'] === 'string'
+  );
+}
+
+function localStorageResumeBackend(key: string): ResumeStorage {
+  return {
+    load: () => {
+      // SSR: no window, nothing to load.
+      if (typeof window === 'undefined') return null;
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          const obj = parsed as Record<string, unknown>;
+          if (typeof obj['sessionId'] === 'string' && typeof obj['resumeToken'] === 'string') {
+            return { sessionId: obj['sessionId'], resumeToken: obj['resumeToken'] };
+          }
+        }
+        return null;
+      } catch {
+        // Corrupted entry or localStorage access denied (private mode, etc.)
+        // — treat as no saved session and let the SDK do a fresh hello.
+        return null;
+      }
+    },
+    save: (creds) => {
+      if (typeof window === 'undefined') return;
+      try {
+        window.localStorage.setItem(key, JSON.stringify(creds));
+      } catch {
+        // Quota exceeded or storage disabled — non-fatal.
+      }
+    },
+    clear: () => {
+      if (typeof window === 'undefined') return;
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // Same as save: best-effort cleanup.
+      }
+    },
+  };
+}
+
+function normalizeResume(option: WebConnectOptions['resume']): {
+  storage: ResumeStorage | null;
+  explicitCreds: ResumeCredentials | null;
+} {
+  if (option === false) return { storage: null, explicitCreds: null };
+  if (option === undefined || option === true) {
+    return {
+      storage: localStorageResumeBackend(DEFAULT_RESUME_STORAGE_KEY),
+      explicitCreds: null,
+    };
+  }
+  if (typeof option === 'string') {
+    return { storage: localStorageResumeBackend(option), explicitCreds: null };
+  }
+  if (isResumeCredentials(option)) {
+    return { storage: null, explicitCreds: option };
+  }
+  return { storage: option, explicitCreds: null };
+}
+
+const customStorageIds = new WeakMap<ResumeStorage, string>();
+let customStorageCounter = 0;
+function identityOf(storage: ResumeStorage): string {
+  let id = customStorageIds.get(storage);
+  if (!id) {
+    id = `custom-${++customStorageCounter}`;
+    customStorageIds.set(storage, id);
+  }
+  return id;
+}
+
+function dedupKeyOf(
+  option: WebConnectOptions['resume'],
+  storage: ResumeStorage | null,
+  explicitCreds: ResumeCredentials | null,
+): string {
+  if (explicitCreds) {
+    return `creds:${explicitCreds.sessionId}\x00${explicitCreds.resumeToken}`;
+  }
+  if (!storage) return 'fresh';
+  if (option === undefined || option === true) return `storage:${DEFAULT_RESUME_STORAGE_KEY}`;
+  if (typeof option === 'string') return `storage:${option}`;
+  return `storage:${identityOf(storage)}`;
 }
 
 /**

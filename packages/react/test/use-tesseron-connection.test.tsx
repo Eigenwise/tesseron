@@ -166,8 +166,12 @@ afterEach(() => {
   globalThis.WebSocket = RealWebSocket;
 });
 
-describe('useTesseronConnection - default behaviour (no resume)', () => {
-  it('calls connect(url) with no second argument', async () => {
+describe('useTesseronConnection - default behaviour', () => {
+  it('persists to default localStorage key when resume is omitted', async () => {
+    // Default `resume` is now `true` — refreshes shouldn't cost the user a
+    // fresh claim code on every reconnect. The hook always passes an explicit
+    // `resume` (creds-or-false) to the web SDK so the SDK's auto-persist
+    // layer doesn't double-write under the hook's storage key.
     const welcome = makeWelcome();
     const { client, calls } = makeFakeClient([welcome]);
 
@@ -178,7 +182,22 @@ describe('useTesseronConnection - default behaviour (no resume)', () => {
     expect(state.claimCode).toBe('AAA-BBB');
     expect(state.resumeStatus).toBe('none');
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual({ url: 'ws://x/y', options: undefined });
+    expect(calls[0]).toEqual({ url: 'ws://x/y', options: { resume: false } });
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY)!)).toEqual({
+      sessionId: 'sess-1',
+      resumeToken: 'tok-fresh',
+    });
+  });
+
+  it('passes resume:false to the client and skips persistence when resume:false is set explicitly', async () => {
+    const welcome = makeWelcome();
+    const { client, calls } = makeFakeClient([welcome]);
+
+    const state = await renderUntilOpenOrError({ resume: false }, client);
+
+    expect(state.status).toBe('open');
+    expect(state.resumeStatus).toBe('none');
+    expect(calls[0]?.options).toEqual({ resume: false });
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
@@ -220,7 +239,7 @@ describe('useTesseronConnection - resume: true (localStorage default)', () => {
 
     await renderUntilOpenOrError({ resume: true }, client);
 
-    expect(calls[0]?.options).toBeUndefined();
+    expect(calls[0]?.options).toEqual({ resume: false });
     const stored = window.localStorage.getItem(STORAGE_KEY);
     expect(stored).not.toBeNull();
     expect(JSON.parse(stored!)).toEqual({ sessionId: 's1', resumeToken: 'tok-A' });
@@ -275,7 +294,7 @@ describe('useTesseronConnection - resume: true (localStorage default)', () => {
       sessionId: 's-stale',
       resumeToken: 'tok-stale',
     });
-    expect(calls[1]?.options).toBeUndefined();
+    expect(calls[1]?.options).toEqual({ resume: false });
     expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY)!)).toEqual({
       sessionId: 's-new',
       resumeToken: 'tok-new',
@@ -307,7 +326,7 @@ describe('useTesseronConnection - resume: true (localStorage default)', () => {
     const state = await renderUntilOpenOrError({ resume: true }, client);
 
     expect(state.status).toBe('open');
-    expect(calls[0]?.options).toBeUndefined();
+    expect(calls[0]?.options).toEqual({ resume: false });
   });
 
   it('skips persistence when the gateway returns no resumeToken', async () => {
@@ -392,7 +411,7 @@ describe('useTesseronConnection - resume: ResumeStorage (custom backend)', () =>
     const state = await renderUntilOpenOrError({ resume: backend }, client);
 
     expect(state.status).toBe('open');
-    expect(calls[0]?.options).toBeUndefined();
+    expect(calls[0]?.options).toEqual({ resume: false });
     expect(backend.save).toHaveBeenCalled();
   });
 
@@ -408,7 +427,7 @@ describe('useTesseronConnection - resume: ResumeStorage (custom backend)', () =>
     const state = await renderUntilOpenOrError({ resume: backend }, client);
 
     expect(state.status).toBe('open');
-    expect(calls[0]?.options).toBeUndefined();
+    expect(calls[0]?.options).toEqual({ resume: false });
   });
 
   it('does not fail the connection when save() throws', async () => {

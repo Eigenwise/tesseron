@@ -2,6 +2,10 @@ import type { StandardSchemaV1 } from '@standard-schema/spec';
 import {
   type ActionAnnotations,
   type ActionContext,
+  type ResumeCredentials,
+  TesseronError,
+  TesseronErrorCode,
+  type ResumeStorage as WebResumeStorage,
   type WebTesseronClient,
   type WelcomeResult,
   tesseron,
@@ -9,6 +13,13 @@ import {
 import { type Ref, onMounted, onUnmounted, ref } from 'vue';
 
 export * from '@tesseron/web';
+
+/** Same shape as `import('@tesseron/web').ResumeStorage`. Re-imported under
+ *  an internal alias because `export * from '@tesseron/web'` already
+ *  re-exports the canonical name from this module — a same-name local
+ *  import would collide (TS 2440). Consumers see `ResumeStorage` from
+ *  `@tesseron/vue` unchanged. */
+type ResumeStorage = WebResumeStorage;
 
 // ─── Action ─────────────────────────────────────────────────────────────────
 
@@ -140,15 +151,104 @@ export interface TesseronConnectionOptions {
   url?: string;
   /** Set to `false` to skip connecting (useful for gating behind auth). Defaults to `true`. */
   enabled?: boolean;
+  /**
+   * Persist `{ sessionId, resumeToken }` so the composable can rejoin an
+   * existing claimed session via `tesseron/resume` after the transport drops
+   * (page refresh, HMR reload, brief network blip) instead of issuing a new
+   * claim code. Mirrors `@tesseron/react`'s `useTesseronConnection.resume`.
+   *
+   * - `true` / omitted *(default)*: persist in `localStorage` under
+   *   `'tesseron:resume'`. Refreshes inside the host idle TTL window keep
+   *   the same session — no re-claim required.
+   * - `false`: no persistence. Every connect is a fresh hello.
+   * - `string`: persist in `localStorage` under that exact key. Use a per-app
+   *   value when you mount multiple Tesseron clients on one page.
+   * - {@link ResumeStorage}: custom `{ load, save, clear }` callbacks (sync or
+   *   async). Use when `localStorage` is not available (Electron with strict
+   *   CSP, an iframe partition, the OS keychain).
+   *
+   * On `TesseronError(ResumeFailed)`, the composable clears the stored
+   * credentials, falls back to a fresh `tesseron/hello`, and surfaces
+   * `resumeStatus: 'failed'`. The freshest token is always persisted.
+   */
+  resume?: boolean | string | ResumeStorage;
 }
+
+/**
+ * Outcome of the resume attempt that produced the current connection.
+ * - `'none'`     — no resume was attempted (no stored creds OR `resume: false`).
+ * - `'resumed'`  — `tesseron/resume` succeeded; the previous session was reattached.
+ * - `'failed'`   — resume was attempted but rejected; the composable fell back to a fresh `tesseron/hello`.
+ */
+export type TesseronResumeStatus = 'none' | 'resumed' | 'failed';
 
 /** Reactive connection state held in the ref returned by {@link tesseronConnection}. */
 export interface TesseronConnectionState {
   status: 'idle' | 'connecting' | 'open' | 'error' | 'closed';
   welcome?: WelcomeResult;
-  /** Claim code to display so the user can paste it into their MCP client. */
+  /**
+   * Claim code to display so the user can paste it into their MCP client.
+   * Present only on a fresh `tesseron/hello`; absent after a successful resume.
+   * Cleared in-place when the gateway sends `tesseron/claimed` so UIs that
+   * show this field disappear once an agent attaches.
+   */
   claimCode?: string;
   error?: Error;
+  /**
+   * Set when `status === 'open'`. See {@link TesseronResumeStatus}.
+   */
+  resumeStatus?: TesseronResumeStatus;
+}
+
+const DEFAULT_RESUME_STORAGE_KEY = 'tesseron:resume';
+
+function localStorageResumeBackend(key: string): ResumeStorage {
+  return {
+    load: () => {
+      if (typeof window === 'undefined') return null;
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          const obj = parsed as Record<string, unknown>;
+          if (typeof obj['sessionId'] === 'string' && typeof obj['resumeToken'] === 'string') {
+            return { sessionId: obj['sessionId'], resumeToken: obj['resumeToken'] };
+          }
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    },
+    save: (creds) => {
+      if (typeof window === 'undefined') return;
+      try {
+        window.localStorage.setItem(key, JSON.stringify(creds));
+      } catch {
+        // Quota exceeded / storage disabled — non-fatal.
+      }
+    },
+    clear: () => {
+      if (typeof window === 'undefined') return;
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // see save()
+      }
+    },
+  };
+}
+
+function resolveResumeStorage(option: TesseronConnectionOptions['resume']): ResumeStorage | null {
+  // Default behaviour: persist via localStorage. Refreshes stop costing the
+  // user a fresh claim code on every reconnect.
+  if (option === undefined || option === true) {
+    return localStorageResumeBackend(DEFAULT_RESUME_STORAGE_KEY);
+  }
+  if (option === false) return null;
+  if (typeof option === 'string') return localStorageResumeBackend(option);
+  return option;
 }
 
 /**
@@ -161,6 +261,10 @@ export interface TesseronConnectionState {
  * {@link tesseronResource} before calling this so they appear in the initial
  * `tesseron/hello` manifest.
  *
+ * Resume is on by default: a page refresh inside the host's idle TTL window
+ * keeps the same Tesseron session paired with the agent — no re-claim needed.
+ * Pass `resume: false` to opt out (incognito-style flows).
+ *
  * @example
  * ```vue
  * <script setup lang="ts">
@@ -172,7 +276,7 @@ export interface TesseronConnectionState {
  * </script>
  *
  * <template>
- *   <p v-if="connection.status === 'open'">
+ *   <p v-if="connection.claimCode">
  *     Claim code: <code>{{ connection.claimCode }}</code>
  *   </p>
  * </template>
@@ -184,28 +288,99 @@ export function tesseronConnection(
 ): Ref<TesseronConnectionState> {
   const state = ref<TesseronConnectionState>({ status: 'idle' });
   let cancelled = false;
+  let unsubscribeWelcome: (() => void) | undefined;
 
   onMounted(() => {
     if (options.enabled === false) return;
     cancelled = false;
     state.value = { status: 'connecting' };
 
-    client
-      .connect(options.url)
-      .then((welcome) => {
-        if (!cancelled) {
-          state.value = { status: 'open', welcome, claimCode: welcome.claimCode };
+    const storage = resolveResumeStorage(options.resume);
+
+    const run = async (): Promise<void> => {
+      let saved: ResumeCredentials | null = null;
+      if (storage) {
+        try {
+          saved = (await storage.load()) ?? null;
+        } catch {
+          // Storage failures are non-fatal — proceed to fresh hello.
+          saved = null;
         }
-      })
-      .catch((error: Error) => {
-        if (!cancelled) {
-          state.value = { status: 'error', error };
+      }
+
+      // Pass an explicit resume value so the underlying web SDK's own auto-
+      // persist layer doesn't double-write under this composable's storage
+      // key — the composable owns load/save/clear here and surfaces
+      // `resumeStatus` reactively, which the SDK's storage layer doesn't.
+      let welcome: WelcomeResult;
+      let resumeStatus: TesseronResumeStatus = 'none';
+      try {
+        welcome = await client.connect(options.url, { resume: saved ?? false });
+        if (saved) resumeStatus = 'resumed';
+      } catch (err) {
+        if (saved && err instanceof TesseronError && err.code === TesseronErrorCode.ResumeFailed) {
+          // Stored creds are stale (TTL elapsed, host destroyed Session, token
+          // rotated by another tab). Best-effort clear and start fresh.
+          if (storage) {
+            try {
+              await storage.clear();
+            } catch {
+              // see localStorageResumeBackend().clear()
+            }
+          }
+          if (cancelled) return;
+          welcome = await client.connect(options.url, { resume: false });
+          resumeStatus = 'failed';
+        } else {
+          throw err;
         }
-      });
+      }
+
+      if (cancelled) return;
+      if (storage && welcome.resumeToken) {
+        try {
+          await storage.save({
+            sessionId: welcome.sessionId,
+            resumeToken: welcome.resumeToken,
+          });
+        } catch {
+          // see localStorageResumeBackend().save()
+        }
+      }
+      if (cancelled) return;
+      state.value = {
+        status: 'open',
+        welcome,
+        claimCode: welcome.claimCode,
+        resumeStatus,
+      };
+    };
+
+    run().catch((error: unknown) => {
+      if (cancelled) return;
+      state.value = {
+        status: 'error',
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    });
+
+    // React to `tesseron/claimed` and any future welcome-mutating notifications
+    // so a UI that branches on `connection.claimCode` clears the claim code
+    // automatically once the agent attaches. Without this, the claim code
+    // stays rendered indefinitely after the user has typed it.
+    unsubscribeWelcome = client.onWelcomeChange((welcome) => {
+      if (cancelled) return;
+      if (state.value.status !== 'open') return;
+      state.value = { ...state.value, welcome, claimCode: welcome.claimCode };
+    });
   });
 
   onUnmounted(() => {
     cancelled = true;
+    if (unsubscribeWelcome) {
+      unsubscribeWelcome();
+      unsubscribeWelcome = undefined;
+    }
   });
 
   return state;

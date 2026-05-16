@@ -44,10 +44,15 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@tesseron/core": "workspace:*"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1",
+    "vitest": "^2.1.0"
   },
   "publishConfig": {
     "access": "public",

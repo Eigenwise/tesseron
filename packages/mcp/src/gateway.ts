@@ -104,11 +104,15 @@ export type ElicitationHandler = (
 ) => Promise<ElicitationResult>;
 
 /**
- * Default zombie-session retention window (90 s). Long enough to cover a
- * manual tab refresh, a routine HMR cycle, or a brief network blip; short
- * enough that abandoned sessions don't accumulate.
+ * Default zombie-session retention window (4 hours). Long enough to span a
+ * typical working session — refreshes, dev-server restarts, lunch breaks,
+ * even a brief laptop sleep — without forcing the user back through the
+ * claim-code dance. `maxZombies` still bounds the in-memory cost; abandoned
+ * sessions get evicted by either the TTL or the LRU cap, whichever fires
+ * first. Override with `TESSERON_RESUME_TTL_MS` (gateway CLI env var) or
+ * `new TesseronGateway({ resumeTtlMs })` for embedders.
  */
-export const DEFAULT_RESUME_TTL_MS = 90_000;
+export const DEFAULT_RESUME_TTL_MS = 4 * 60 * 60 * 1000;
 /**
  * Default cap on {@link TesseronGateway.zombieSessions}. A peer that repeatedly
  * connects and disconnects could otherwise pile up zombies until their TTLs

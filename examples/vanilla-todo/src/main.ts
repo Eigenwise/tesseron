@@ -428,3 +428,13 @@ try {
   state.connection = { status: 'error', claimCode: undefined, error: (e as Error).message };
 }
 render();
+
+// React to `tesseron/claimed` (and any future welcome-mutating notifications):
+// the SDK patches the cached welcome in place and fires onWelcomeChange. Without
+// this subscription the claim code stays in the rendered UI forever after the
+// agent attaches — confusing for users who think they need to type a dead code.
+tesseron.onWelcomeChange((welcome) => {
+  if (state.connection.status !== 'open') return;
+  state.connection = { ...state.connection, claimCode: welcome.claimCode };
+  render();
+});

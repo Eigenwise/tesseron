@@ -8,14 +8,19 @@ related:
   - protocol/lifecycle
 ---
 
-A Tesseron session lives in the gateway's memory. When the underlying WebSocket drops (tab refresh, window close, network blip, HMR reload), the session normally goes away and a reconnecting app would have to go through the full `tesseron/hello` + claim-code dance again - even if the user had already paired it.
+A Tesseron session lives somewhere — the gateway's memory for gateway-minted sessions, the host's memory for host-minted sessions (e.g. behind `@tesseron/vite`). When the underlying WebSocket drops (tab refresh, window close, network blip, HMR reload), the session would normally go away and a reconnecting app would have to go through the full `tesseron/hello` + claim-code dance again — even if the user had already paired it.
 
 The `tesseron/resume` method lets the app rejoin an existing session it paired earlier, skipping the re-claim. Storage of the resume credentials is deliberately **the implementer's responsibility**: different apps have different opinions about where session credentials can live (localStorage, a cookie, an Electron store, the OS keychain), so the SDK exposes the primitive and leaves the choice to you.
+
+Both mint flows (gateway-minted and host-minted) honour resume:
+
+- **Gateway-minted sessions** (Node-side hosts via `@tesseron/server`): the gateway holds a zombie of the closed session for `resumeTtlMs` and reattaches the new socket on a matching `{ sessionId, resumeToken }`.
+- **Host-minted sessions** (browser tabs via `@tesseron/vite`): the host holds the Session in memory for `sessionIdleTtlMs` and reattaches the new browser WebSocket on a matching `{ sessionId, resumeToken }`. The gateway-side bridge stays open across the detach — the agent sees no disconnect.
 
 ## Flow
 
 1. On a fresh `tesseron/hello`, the gateway returns a `resumeToken` in the welcome. Stash it alongside the `sessionId` wherever fits your app.
-2. When the transport drops, the gateway keeps the session's metadata as a "zombie" for `resumeTtlMs` (default 90 seconds).
+2. When the transport drops, the gateway keeps the session's metadata as a "zombie" for `resumeTtlMs` (default 4 hours, configurable via env var `TESSERON_RESUME_TTL_MS` or per-gateway `new TesseronGateway({ resumeTtlMs })`).
 3. On reconnect, the app sends `tesseron/resume` with `{ sessionId, resumeToken }`. If the token matches (constant-time compare) and the zombie is still within its TTL, the gateway reattaches the fresh socket to the existing session and rotates the token.
 4. The caller persists the **new** `resumeToken` from the resume response.
 
@@ -89,17 +94,17 @@ Two knobs on `new TesseronGateway({ ... })` shape how aggressive resume is:
 
 ```ts
 const gateway = new TesseronGateway({
-  resumeTtlMs: 300_000, // 5 minutes (default: 90_000)
+  resumeTtlMs: 300_000, // 5 minutes (default: 14_400_000 / 4 hours)
   maxZombies: 500,      // cap on zombies held simultaneously (default: 100)
 });
 ```
 
-- `resumeTtlMs` — how long a closed session is retained as a resumable zombie. Set to `0` to disable resume entirely: closed sessions drop immediately and any reconnect must start fresh.
+- `resumeTtlMs` — how long a closed session is retained as a resumable zombie. Default 4 hours; long enough to span a normal working session (casual refreshes, dev-server restarts, lunch breaks, brief laptop sleep) without forcing the user back through the claim-code dance. Set to `0` to disable resume entirely: closed sessions drop immediately and any reconnect must start fresh. The `@tesseron/mcp` CLI also reads the `TESSERON_RESUME_TTL_MS` env var (non-negative integer milliseconds) so operators can tune it without forking the gateway.
 - `maxZombies` — ceiling on the in-memory zombie map. When inserting a new zombie would exceed it, the oldest (longest-retained) zombie is evicted to make room. Keeps a connect/disconnect flood from piling up zombies faster than their TTLs expire. Set to `0` to disable resume entirely (same effect as `resumeTtlMs: 0`).
 
 ## Idiomatic SDK usage
 
-The SDK exposes a single `resume` field on `ConnectOptions`. You decide where to stash the token:
+`@tesseron/web` auto-persists by default. From `2.9.0`, `tesseron.connect()` loads stored credentials, sends `tesseron/resume`, saves the rotated token, and transparently falls back to a fresh `tesseron/hello` if the resume fails — no glue code required:
 
 ```ts
 import { tesseron } from '@tesseron/web';
@@ -107,21 +112,34 @@ import { tesseron } from '@tesseron/web';
 tesseron.app({ id: 'shop', name: 'Acme Shop' });
 tesseron.action('searchProducts').handler(/* ... */);
 
-const saved = localStorage.getItem('tesseron:shop');
-const welcome = await tesseron.connect(
-  undefined, // defaults to the @tesseron/vite bridge at `<origin>/@tesseron/ws`
-  saved ? { resume: JSON.parse(saved) } : undefined,
-);
-
-localStorage.setItem('tesseron:shop', JSON.stringify({
-  sessionId: welcome.sessionId,
-  resumeToken: welcome.resumeToken,
-}));
+const welcome = await tesseron.connect();
+// Refresh the page → next connect resumes the same session,
+// agent stays paired, no new claim code.
 ```
 
-Four lines. The SDK does not do this for you; `localStorage` is one answer among many. A desktop app might stash the pair in the OS keychain. A server process might put it in a file next to its config. An iframe-embedded app might have CSP reasons not to persist at all.
+Refresh costs nothing inside the TTL window. The default backend is `localStorage` under the key `tesseron:resume`. To use a different key, pass a string. To opt out of persistence (incognito-style flows), pass `resume: false`. To run a custom backend (OS keychain, Electron store, IPC channel), implement `ResumeStorage`:
 
-If you're using [`@tesseron/react`](/sdk/typescript/react/), the `useTesseronConnection` hook bakes in this recipe behind a `resume` option - pass `resume: true` to persist via `localStorage` automatically, or hand it a `ResumeStorage` object for custom backends.
+```ts
+import { tesseron, type ResumeStorage } from '@tesseron/web';
+
+const keychainBackend: ResumeStorage = {
+  load: () => ipc.invoke('tesseron:load'),
+  save: (creds) => ipc.invoke('tesseron:save', creds),
+  clear: () => ipc.invoke('tesseron:clear'),
+};
+
+await tesseron.connect(undefined, { resume: keychainBackend });
+```
+
+If you've already loaded credentials yourself and just want to forward them, pass a `ResumeCredentials` literal — the SDK uses it as-is and does not auto-persist (that's your job):
+
+```ts
+await tesseron.connect(undefined, {
+  resume: { sessionId, resumeToken }, // explicit; SDK won't write to localStorage
+});
+```
+
+If you're using [`@tesseron/react`](/sdk/typescript/react/), the `useTesseronConnection` hook bakes in the same flow and exposes `resumeStatus` (`'none' | 'resumed' | 'failed'`) for UIs that want to show "your previous session expired" instead of silently rendering a new claim code.
 
 ### Falling back when resume fails
 

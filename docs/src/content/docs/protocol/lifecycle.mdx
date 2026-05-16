@@ -76,14 +76,16 @@ From inside your handler, on any Closed transition:
 });
 ```
 
-## Reconnection doesn't resume - it starts over
+## Reconnection: plain `tesseron/hello` starts over, `tesseron/resume` doesn't
 
-`tesseron.connect()` after a disconnect yields a **new** `sessionId` and **new** `claimCode`. The agent must re-claim. In-flight work from the old session is gone.
+A plain `tesseron/hello` after a disconnect yields a **new** `sessionId` and **new** `claimCode`. The agent must re-claim. In-flight work from the old session is gone.
 
-Why not resumable? Two reasons:
+Why not resumable by default at the protocol level? Two reasons:
 
 1. The agent's tool list is cached around the old session. Silently rebinding would make the old tool names still appear to work, while pointing at a different session. That's worse than requiring a fresh claim.
 2. Claim is meant to be a user-visible act. An invisible reconnection would bypass the "human-in-the-loop authorisation" the claim code represents.
+
+[Session resume](/protocol/resume/) (`tesseron/resume` with a stored `resumeToken`) sidesteps this by binding the new socket to a specific previously-claimed `sessionId`. The agent sees the same tool list, the user does nothing. `@tesseron/web` performs this round-trip automatically by default — see the resume page for the four shapes the `resume` option accepts and how to opt out.
 
 ## MCP gateway restart
 
@@ -91,7 +93,7 @@ If the gateway process dies (plugin disabled, Claude Code restart, crash):
 
 - Every app's WebSocket closes with code 1001 (`Going Away`).
 - Every SDK instance aborts in-flight work and rejects pending requests.
-- Apps are free to `connect()` again when the gateway comes back.
+- Apps are free to `connect()` again when the gateway comes back. Zombie sessions are held in gateway-process memory only, so a gateway restart wipes every resumable session — a reconnect after gateway restart will always be a fresh `tesseron/hello` with a new claim code, regardless of what the SDK had stored.
 
 A small "reconnect" loop in your app UI - with exponential backoff - is reasonable. Expose the new claim code to the user when the new session is established.
 

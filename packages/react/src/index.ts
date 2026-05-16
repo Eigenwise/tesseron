@@ -5,6 +5,7 @@ import {
   type ResumeCredentials,
   TesseronError,
   TesseronErrorCode,
+  type ResumeStorage as WebResumeStorage,
   type WebTesseronClient,
   type WelcomeResult,
   tesseron,
@@ -12,6 +13,15 @@ import {
 import { useEffect, useRef, useState } from 'react';
 
 export * from '@tesseron/web';
+
+/**
+ * Alias of {@link import('@tesseron/web').ResumeStorage}. Imported locally
+ * with a different name because `export * from '@tesseron/web'` already
+ * re-exports the public name from this module, and a same-name local import
+ * would collide (TS 2440). Consumers should still see the canonical
+ * `ResumeStorage` from `@tesseron/react`.
+ */
+type ResumeStorage = WebResumeStorage;
 
 /** Options for {@link useTesseronAction}; mirrors the chained {@link ActionBuilder} methods as a single object. */
 export interface UseTesseronActionOptions<I, O> {
@@ -113,20 +123,6 @@ export function useTesseronResource<T = unknown>(
   }, [name, client]);
 }
 
-/**
- * Persistence backend for resume credentials. Implementations may be sync or
- * async; the hook awaits each call. Returning `null` or `undefined` from
- * `load` means "no stored session, do a fresh hello." Throws from any method
- * are non-fatal: the hook treats them like an empty backend (load) or a
- * silent no-op (save/clear) so storage problems can't fail-close the
- * connection.
- */
-export interface ResumeStorage {
-  load: () => ResumeCredentials | null | undefined | Promise<ResumeCredentials | null | undefined>;
-  save: (credentials: ResumeCredentials) => void | Promise<void>;
-  clear: () => void | Promise<void>;
-}
-
 /** Options for {@link useTesseronConnection}. */
 export interface UseTesseronConnectionOptions {
   /** Gateway URL; defaults to `DEFAULT_GATEWAY_URL` (the local bridge). */
@@ -139,8 +135,11 @@ export interface UseTesseronConnectionOptions {
    * refresh, HMR reload, brief network blip) instead of issuing a new claim
    * code. See [protocol/resume](https://tesseron.dev/protocol/resume/).
    *
-   * - `false` / omitted (default): no persistence. Every connect is a fresh hello.
-   * - `true`: persist in `localStorage` under `'tesseron:resume'`.
+   * - `true` / omitted (default): persist in `localStorage` under
+   *   `'tesseron:resume'`. This is the right answer for almost every app —
+   *   refreshes and brief drops stop costing the user a fresh claim code.
+   * - `false`: no persistence. Every connect is a fresh hello. Use for
+   *   incognito-style flows that must not carry session state across reloads.
    * - `string`: persist in `localStorage` under that exact key. Use a per-app
    *   value when you have multiple `WebTesseronClient` instances per page.
    * - `ResumeStorage`: custom `{ load, save, clear }` callbacks. Useful when
@@ -257,8 +256,12 @@ function localStorageResumeBackend(key: string): ResumeStorage {
 function resolveResumeStorage(
   option: UseTesseronConnectionOptions['resume'],
 ): ResumeStorage | null {
-  if (!option) return null;
-  if (option === true) return localStorageResumeBackend(DEFAULT_RESUME_STORAGE_KEY);
+  // Default behaviour: persist via localStorage. Refreshes and brief drops
+  // stop costing the user a fresh claim code on every reconnect.
+  if (option === undefined || option === true) {
+    return localStorageResumeBackend(DEFAULT_RESUME_STORAGE_KEY);
+  }
+  if (option === false) return null;
   if (typeof option === 'string') return localStorageResumeBackend(option);
   return option;
 }
@@ -315,10 +318,16 @@ export function useTesseronConnection(
       // same URL + same resume creds + concurrent calls → shared promise,
       // single socket. That's what fixes the StrictMode / HMR resume race
       // (tesseron#88).
+      //
+      // `resume: false` is passed explicitly when we have no saved creds (or
+      // are recovering from a failed resume) so the web SDK's own auto-
+      // persist layer stays out of the hook's storage: the hook owns load/
+      // save/clear here and surfaces `resumeStatus` reactively, which the
+      // web SDK's storage layer can't.
       let welcome: WelcomeResult;
       let resumeStatus: TesseronResumeStatus = 'none';
       try {
-        welcome = await client.connect(url, saved ? { resume: saved } : undefined);
+        welcome = await client.connect(url, { resume: saved ?? false });
         if (saved) resumeStatus = 'resumed';
       } catch (err) {
         if (saved && err instanceof TesseronError && err.code === TesseronErrorCode.ResumeFailed) {
@@ -334,7 +343,7 @@ export function useTesseronConnection(
             }
           }
           if (cancelled) return;
-          welcome = await client.connect(url);
+          welcome = await client.connect(url, { resume: false });
           resumeStatus = 'failed';
         } else {
           throw err;

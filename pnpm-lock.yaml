@@ -434,6 +434,13 @@ importers:
       '@tesseron/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@24.12.2)(jsdom@25.0.1)
 
 packages:
 

@@ -91,10 +91,12 @@ Opens the connection on mount and returns a `Readable<TesseronConnectionState>`:
   const connection = tesseronConnection();
 </script>
 
-{#if $connection.status === 'open'}
+{#if $connection.claimCode}
   <p>Claim code: <code>{$connection.claimCode}</code></p>
 {/if}
 ```
+
+`$connection.claimCode` clears reactively when the agent claims the session — the store subscribes to `client.onWelcomeChange` and patches the state on `tesseron/claimed`, so a template that branches on `claimCode` hides automatically without any extra logic.
 
 `TesseronConnectionState`:
 
@@ -104,10 +106,32 @@ interface TesseronConnectionState {
   welcome?: WelcomeResult;
   claimCode?: string;
   error?: Error;
+  resumeStatus?: 'none' | 'resumed' | 'failed';
 }
 ```
 
-Options: `{ url?: string; enabled?: boolean }`. Set `enabled: false` to defer the connection (e.g., behind an auth gate).
+Options:
+
+```ts
+interface TesseronConnectionOptions {
+  url?: string;       // gateway URL; defaults to /@tesseron/ws
+  enabled?: boolean;  // false → skip connecting (e.g. behind an auth gate)
+  resume?: boolean | string | ResumeStorage; // default true
+}
+```
+
+#### `resume` — survive page refresh / HMR
+
+`resume` defaults to `true` — the store persists `{ sessionId, resumeToken }` to `localStorage` under `'tesseron:resume'` and replays it on the next mount via `tesseron/resume`. Refresh inside the [host idle TTL window](/sdk/typescript/vite/#sessions-span-browser-refreshes) (default 4 hours) keeps the same Tesseron session paired with the agent — no claim code re-entry needed.
+
+| Form | Behaviour |
+|---|---|
+| `true` *(default)* | Persist in `localStorage` under `'tesseron:resume'`. |
+| `false` | No persistence. Every connect is a fresh hello. |
+| `string` | Persist in `localStorage` under that exact key. |
+| `ResumeStorage` | Custom `{ load, save, clear }` callbacks (sync or async). |
+
+`$connection.resumeStatus` (set when `status === 'open'`) reports `'resumed'` after a successful resume, `'failed'` after a rejected resume + fallback to fresh hello, or `'none'` otherwise. See [Session resume](/protocol/resume/) for the protocol-level semantics.
 
 ## Why an adapter at all
 

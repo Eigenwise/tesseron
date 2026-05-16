@@ -32,8 +32,9 @@ It starts, listens on stdio for MCP, and begins watching `~/.tesseron/instances/
 | Env var | Default | Purpose |
 |---|---|---|
 | `TESSERON_TOOL_SURFACE` | `both` | `dynamic` / `meta` / `both`. Controls which MCP tools the bridge advertises (per-app tools, meta-dispatcher tools, or both). |
+| `TESSERON_RESUME_TTL_MS` | `14_400_000` (4 hours) | How long a closed session is retained as a resumable zombie before the gateway evicts it. Non-negative integer milliseconds; `0` disables resume entirely. Invalid values log a warning to stderr and fall through to the default. Matches the `resumeTtlMs` constructor option for embedders. |
 
-That's the whole list. No ports, no hosts, no allowlists - the gateway has nothing to bind, so it has nothing to configure.
+No ports, no hosts, no allowlists - the gateway has nothing to bind, so it has nothing to configure beyond the two surface knobs above.
 
 The advertised protocol version is pinned to `PROTOCOL_VERSION` in `@tesseron/core` and is not configurable at runtime.
 

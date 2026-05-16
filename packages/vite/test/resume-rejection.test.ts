@@ -1,14 +1,17 @@
 /**
- * Coverage for tesseron#68: the host-mint Vite plugin must respond to
- * `tesseron/resume` directly. The plugin mints a fresh sessionId and
- * resumeToken at every WS open, so any incoming resume's tokens belong
- * to a previous instance the host can no longer validate. Without an
- * explicit handler, the resume frame sat in the queue waiting for a
- * gateway dial that never arrives for an unclaimed instance — the SDK
- * hung at `status: 'connecting'` forever.
+ * Coverage for the host-mint resume contract.
  *
- * The fix answers ResumeFailed (-32011) so the SDK clears its stored
- * creds and falls back to a fresh `tesseron/hello`.
+ * Previous behavior (tesseron#68): the plugin rejected *every* `tesseron/resume`
+ * because each new browser WebSocket open minted a fresh sessionId and
+ * resumeToken host-side, leaving any incoming resume token unverifiable.
+ *
+ * Current behavior: the plugin owns a {@link Session} keyed by the host-minted
+ * `sessionId`. Browser WSes attach via either `tesseron/hello` (create a new
+ * Session) or `tesseron/resume` (re-attach to an existing Session if the token
+ * matches). A resume request whose `sessionId` is unknown — or whose token
+ * doesn't validate — still gets `ResumeFailed` so the SDK can fall back to a
+ * fresh hello. The successful-resume path is exercised in
+ * `host-mint-resume.test.ts`.
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -82,8 +85,6 @@ async function bootPlugin(): Promise<{ url: string }> {
     config: { root: '/test/project' },
   };
   const plugin = tesseron({ appName: 'resume-test' });
-  // configureServer is typed for the real Vite type but accepts our
-  // partial mock at runtime.
   (plugin.configureServer as (s: unknown) => void)(mockServer);
   await new Promise<void>((resolve) => {
     httpServer.listen(0, '127.0.0.1', () => resolve());
@@ -120,8 +121,8 @@ async function open(url: string): Promise<WebSocket> {
   return ws;
 }
 
-describe('Vite plugin / tesseron/resume on host-mint path (tesseron#68)', () => {
-  it('answers tesseron/resume with ResumeFailed instead of hanging', async () => {
+describe('Vite plugin / tesseron/resume — rejection paths', () => {
+  it('answers ResumeFailed when the sessionId is unknown (no matching Session)', async () => {
     const { url } = await bootPlugin();
     const ws = await open(url);
 
@@ -133,7 +134,7 @@ describe('Vite plugin / tesseron/resume on host-mint path (tesseron#68)', () => 
         protocolVersion: '1.1.0',
         sessionId: 'sess-from-previous-page-load',
         resumeToken: 'tok-stale',
-        app: { id: 'my-app', name: 'My App' },
+        app: { id: 'my_app', name: 'My App' },
         actions: [],
         resources: [],
         capabilities: {
@@ -150,14 +151,42 @@ describe('Vite plugin / tesseron/resume on host-mint path (tesseron#68)', () => 
     expect(response.result).toBeUndefined();
     expect(response.error).toBeDefined();
     expect(response.error?.code).toBe(TesseronErrorCode.ResumeFailed);
-    expect(response.error?.message).toMatch(/host-minted session does not honour resume/i);
+    expect(response.error?.message).toMatch(/No resumable Tesseron session/i);
+  });
+
+  it('answers ResumeFailed when sessionId/resumeToken are missing or non-string', async () => {
+    const { url } = await bootPlugin();
+    const ws = await open(url);
+
+    const response = await send(ws, {
+      jsonrpc: '2.0',
+      id: 7,
+      method: 'tesseron/resume',
+      params: {
+        protocolVersion: '1.1.0',
+        // sessionId omitted
+        app: { id: 'my_app', name: 'My App' },
+        actions: [],
+        resources: [],
+        capabilities: {
+          streaming: true,
+          subscriptions: true,
+          sampling: false,
+          elicitation: false,
+        },
+      },
+    });
+
+    expect(response.id).toBe(7);
+    expect(response.error?.code).toBe(TesseronErrorCode.ResumeFailed);
+    expect(response.error?.message).toMatch(/malformed|required strings/i);
   });
 
   it('still synthesizes a fresh hello after a rejected resume on the same socket', async () => {
-    // Defensive: make sure the resume rejection path doesn't poison
-    // entry.helloAnswered or otherwise break the subsequent fresh hello
-    // the SDK falls back to. (The SDK normally does the fresh hello on
-    // a *new* socket, but the plugin shouldn't depend on that.)
+    // Defensive: make sure the rejection path doesn't poison the Session
+    // state and break a subsequent fresh hello on the same socket. (The
+    // SDK normally opens a new socket for fallback, but the plugin
+    // shouldn't depend on that.)
     const { url } = await bootPlugin();
     const ws = await open(url);
 
