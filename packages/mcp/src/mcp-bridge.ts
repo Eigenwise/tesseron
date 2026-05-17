@@ -345,9 +345,7 @@ export class McpAgentBridge {
         tools.push(...META_DISPATCHER_TOOLS);
       }
       if (this.toolSurface === 'dynamic' || this.toolSurface === 'both') {
-        tools.push(
-          ...this.gateway.getClaimedSessions().flatMap((session) => sessionToTools(session)),
-        );
+        tools.push(...this.liveClaimedSessions().flatMap((session) => sessionToTools(session)));
       }
       return { tools };
     });
@@ -466,9 +464,9 @@ export class McpAgentBridge {
 
   private registerResourceHandlers(): void {
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-      resources: this.gateway
-        .getClaimedSessions()
-        .flatMap((session) => session.resources.map((r) => resourceToMcp(session, r))),
+      resources: this.liveClaimedSessions().flatMap((session) =>
+        session.resources.map((r) => resourceToMcp(session, r)),
+      ),
     }));
 
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
@@ -520,24 +518,49 @@ export class McpAgentBridge {
   }
 
   /**
-   * Picks the most-recently-claimed session matching `appId`. The gateway can
-   * legitimately hold more than one claimed session per `app.id`: a second
-   * browser tab opening the app, an HMR-driven reconnect that briefly overlaps
-   * with the prior socket, or a long-tailed close event that hasn't fired yet.
-   * `Map` iteration order is insertion order, so a naive `find` returns the
-   * oldest match — which can be a phantom whose transport is dead, in which
-   * case the action invocation or resource read hangs indefinitely. Picking
-   * the latest `claimedAt` matches what the user actually intends to drive.
+   * Picks the live, most-recently-claimed session matching `appId`. The
+   * gateway can legitimately hold more than one claimed session per `app.id`:
+   * a second browser tab opening the app, an HMR-driven reconnect that
+   * briefly overlaps with the prior socket, or a long-tailed close event
+   * that hasn't fired yet. Without a liveness filter, a phantom whose
+   * transport is already dead but whose `claimedAt` is newer than the
+   * actually-live session would win, and the action invocation or resource
+   * read would hang on a closed socket forever. See tesseron#92.
+   *
+   * Selection rules:
+   * 1. Skip any session whose `transport.isClosed()` reports true. The
+   *    Transport interface declares this as optional; implementations that
+   *    can't report liveness are treated as live (preserves the pre-#92
+   *    behaviour for those transports).
+   * 2. Among the live candidates, pick the one with the largest
+   *    `claimedAt` — matches what the user actually paired most recently.
+   * 3. If no live candidate exists but a dead one matches `appId`, return
+   *    `undefined`. The caller surfaces this as a clean "no claimed session"
+   *    error rather than routing to a dead socket.
    */
   private latestClaimedByApp(appId: string): Session | undefined {
     let latest: Session | undefined;
     for (const session of this.gateway.getClaimedSessions()) {
       if (session.app.id !== appId) continue;
+      // Liveness filter (tesseron#92).
+      if (session.transport.isClosed?.()) continue;
       if (!latest || (session.claimedAt ?? 0) > (latest.claimedAt ?? 0)) {
         latest = session;
       }
     }
     return latest;
+  }
+
+  /**
+   * Claimed sessions whose underlying transport is still live. Wraps
+   * `gateway.getClaimedSessions()` with the same `isClosed?.()` filter the
+   * single-session selector applies, so the agent's tool / resource listings
+   * never advertise a session whose transport is gone (tesseron#92). A
+   * transport that doesn't implement the optional probe is treated as live,
+   * preserving the pre-#92 behaviour for custom or in-memory transports.
+   */
+  private liveClaimedSessions(): Session[] {
+    return this.gateway.getClaimedSessions().filter((s) => !s.transport.isClosed?.());
   }
 
   private locateResource(uri: string): { session: Session; resourceName: string } | null {
@@ -559,7 +582,7 @@ export class McpAgentBridge {
   private handleListActions(): {
     content: Array<{ type: 'text'; text: string }>;
   } {
-    const claimed = this.gateway.getClaimedSessions();
+    const claimed = this.liveClaimedSessions();
     const sessions = claimed.map((session) => ({
       app_id: session.app.id,
       name: session.app.name,

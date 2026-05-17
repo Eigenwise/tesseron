@@ -27,6 +27,19 @@ export interface Transport {
   onClose(handler: (reason?: string) => void): void;
   /** Close the channel. Must eventually trigger the registered `onClose` handler. */
   close(reason?: string): void;
+  /**
+   * Optional liveness probe. Returns `true` when the underlying channel is
+   * already closed (or in the process of closing) and any `send()` would be a
+   * no-op or throw. Consumers — particularly the gateway's routing logic —
+   * use this to avoid forwarding work to a transport whose `onClose` handler
+   * hasn't fired yet (e.g. a long-tailed WebSocket close event), which would
+   * strand the request and hang the caller. Implementations that can't cheaply
+   * report liveness may omit this; absent the probe, the consumer treats the
+   * transport as live and falls back to its previous behaviour.
+   *
+   * Must be side-effect-free.
+   */
+  isClosed?(): boolean;
 }
 
 /**

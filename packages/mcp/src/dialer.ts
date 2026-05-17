@@ -126,6 +126,14 @@ export class WsDialer implements GatewayDialer<'ws'> {
       close(reason?: string): void {
         ws.close(1000, reason);
       },
+      // Liveness probe (tesseron#92). Reports true once `ws.readyState` enters
+      // CLOSING (2) or CLOSED (3). Routing-side selectors filter on this to
+      // avoid forwarding work to a socket whose close event is in flight but
+      // hasn't run the gateway's cleanup yet.
+      isClosed(): boolean {
+        const s = ws.readyState;
+        return s === ws.CLOSING || s === ws.CLOSED;
+      },
     };
 
     return {
@@ -282,6 +290,14 @@ export class UdsDialer implements GatewayDialer<'uds'> {
       },
       close(_reason?: string): void {
         socket.end();
+      },
+      // Liveness probe (tesseron#92). Mirrors WsDialer's: returns true once
+      // the underlying socket is destroyed or no longer writable. `destroyed`
+      // covers the post-close state; `!writable` catches the half-closed
+      // window where the peer FIN'd but the local side hasn't yet emitted
+      // `close`. Side-effect-free.
+      isClosed(): boolean {
+        return socket.destroyed || socket.writable === false;
       },
     };
 
