@@ -5,7 +5,7 @@ description: Quick-reference mental model for the Tesseron TypeScript SDK — co
 
 # Tesseron Framework
 
-Tesseron is a TypeScript protocol + SDK that lets a live web app expose typed, prefixed actions and resources to MCP-compatible AI agents (Claude Code, Claude Desktop, Cursor, and others) over WebSocket. Instead of the agent automating a browser to drive the UI, the app directly tells the agent *what it can do*. Each tool invocation runs a real handler against real state — no DOM scraping, no screenshot analysis.
+Tesseron is a protocol + SDK that lets a live app (a browser tab, a Node service/CLI, or an Electron/Tauri desktop app today; any language that speaks WebSocket + JSON-RPC 2.0 in principle) expose typed, prefixed actions and resources to MCP-compatible AI agents (Claude Code, Claude Desktop, Cursor, and others) over WebSocket. Instead of the agent automating a browser to drive the UI, the app directly tells the agent *what it can do*. Each tool invocation runs a real handler against real state — no DOM scraping, no screenshot analysis.
 
 This skill orients Claude on the framework and routes to focused reference files as the task requires.
 

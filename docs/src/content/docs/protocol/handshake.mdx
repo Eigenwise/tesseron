@@ -17,7 +17,7 @@ A Tesseron session goes through three states: **connected**, **awaiting claim**,
   actorWidth={170}
   actorGap={50}
   actors={[
-    { id: 'app', label: 'WEB APP',  sub: '@tesseron/web', icon: 'window' },
+    { id: 'app', label: 'YOUR APP',  sub: '@tesseron/web', icon: 'window' },
     { id: 'gw',  label: 'MCP GATEWAY', sub: '@tesseron/mcp', icon: 'bridge', variant: 'accent' },
     { id: 'u',   label: 'USER',    icon: 'user' },
     { id: 'a',   label: 'AGENT',   sub: 'Claude Code',  icon: 'agent' },
@@ -148,7 +148,7 @@ The notification only fires on a fresh-hello path. After a successful `tesseron/
 
 ## Why out-of-band claim?
 
-Because in-band claim is just security theatre over localhost. Anything running on the user's machine can read `~/.tesseron/instances/` and dial one of those endpoints. The claim code is a **user-typed confirmation** - proof that a human authorised this specific browser tab to be controlled by this specific agent session. It's short enough to read aloud, long enough to resist guessing (~1.5 billion combinations of 6 upper-case alphanumeric minus confusables).
+Because in-band claim is just security theatre over localhost. Anything running on the user's machine can read `~/.tesseron/instances/` and dial one of those endpoints. The claim code is a **user-typed confirmation** - proof that a human authorised this specific app to be controlled by this specific agent session. It's short enough to read aloud, long enough to resist guessing (~1.5 billion combinations of 6 upper-case alphanumeric minus confusables).
 
 ## Multiple gateways on one machine
 
