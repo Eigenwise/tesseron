@@ -9,7 +9,7 @@
 
 # @tesseron/core
 
-Protocol types and action builder for [Tesseron](https://github.com/BrainBlend-AI/tesseron) — a TypeScript SDK + MCP gateway that exposes typed web-app actions to MCP-compatible AI agents (Claude Code, Claude Desktop, Cursor, Copilot, Codex, ...) over a local WebSocket.
+Protocol types and action builder for [Tesseron](https://github.com/BrainBlend-AI/tesseron) — a protocol + TypeScript SDK + MCP gateway that exposes the typed actions a live app already has to MCP-compatible AI agents (Claude Code, Claude Desktop, Cursor, Copilot, Codex, ...) over a local WebSocket.
 
 > **Most users don't install `@tesseron/core` directly.** Reach for one of the framework-targeted packages instead:
 >

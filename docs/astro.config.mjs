@@ -45,7 +45,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Tesseron',
-      description: 'Expose typed web-app actions to MCP-compatible agents over WebSocket.',
+      description: 'Expose typed app actions to MCP-compatible agents over WebSocket.',
       logo: {
         light: './src/assets/tesseron-smallcaps-light.png',
         dark: './src/assets/tesseron-smallcaps-dark.png',
@@ -81,7 +81,7 @@ export default defineConfig({
         starlightLlmsTxt({
           projectName: 'Tesseron',
           description:
-            'Tesseron is a TypeScript protocol and SDK for exposing typed web-app actions to MCP-compatible AI agents over WebSocket. Your app declares actions and resources; a local MCP gateway turns them into tools the agent can invoke. No browser automation, no scraping, no Playwright.',
+            'Tesseron is a protocol and TypeScript SDK for exposing the typed actions a live app already has to MCP-compatible AI agents over WebSocket. Your app - browser, Node, or desktop - declares actions and resources; a local MCP gateway turns them into tools the agent can invoke. The protocol is language-agnostic; the JS/TS SDKs are the reference implementation. No browser automation, no scraping, no Playwright.',
           details: [
             '## For AI agents reading this file',
             '',
@@ -111,6 +111,7 @@ export default defineConfig({
           items: [
             { label: 'What is Tesseron?', link: '/' },
             { label: 'Why Tesseron?', link: '/overview/why/' },
+            { label: 'What you can build', link: '/overview/what-you-can-build/' },
             { label: 'Architecture at a glance', link: '/overview/architecture/' },
             { label: 'Quickstart (5 minutes)', link: '/overview/quickstart/' },
           ],

@@ -1,6 +1,6 @@
 ---
 title: Tesseron
-description: Expose typed web-app actions to MCP-compatible AI agents over WebSocket. No browser automation, no scraping.
+description: An accessibility layer for AI agents. Expose typed app actions to MCP-compatible agents over WebSocket. No browser automation, no scraping.
 related:
   - overview/quickstart
   - overview/why
@@ -8,8 +8,9 @@ related:
 template: splash
 hero:
   tagline: |
-    Expose typed web-app actions to MCP-compatible AI agents over WebSocket.
-    No browser automation, no scraping, no Playwright.
+    An accessibility layer for AI agents. Expose the typed actions your app
+    already has to any MCP-compatible agent over WebSocket — no browser
+    automation, no scraping, no Playwright.
   image:
     light: ../../assets/tesseron-hex.svg
     dark: ../../assets/tesseron-hex-dark.svg
@@ -31,7 +32,7 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import Diagram from '../../components/Diagram.astro';
 
 <Diagram
-  caption="Your web app declares actions. The MCP gateway bridges them to any MCP-capable agent (Claude Code, Cursor, Claude Desktop)."
+  caption="Your app declares actions. The MCP gateway bridges them to any MCP-capable agent (Claude Code, Cursor, Claude Desktop)."
   nodeWidth={130}
   spacing={140}
   pad={42}
@@ -51,6 +52,8 @@ import Diagram from '../../components/Diagram.astro';
     { from: 'gw',   to: 'agent', label: 'MCP stdio', bidirectional: true, accent: true },
   ]}
 />
+
+**The agent doesn't need to click a button - it needs to do the thing the button does.** You declare the typed actions your app already performs; Tesseron exposes them to any MCP agent as tools, and your real handler runs in your real process against your real state. It's a protocol, not just a TypeScript library, and not just for the web - the SDKs cover browser, Node, and desktop today, and anything that speaks WebSocket + JSON-RPC 2.0 can host actions in any language ([Python and Rust are on the roadmap](/sdk/porting/)).
 
 ## What you get
 

@@ -34,7 +34,19 @@
 
 **NEW: Join our community on Discord at [discord.gg/J3W9b5AZJR](https://discord.gg/J3W9b5AZJR) — protocol questions, feedback, and SDK-contribution chat all welcome.**
 
-Live applications (browser tabs, Electron/Tauri desktop apps, Node daemons, CLIs) declare actions with a Zod-style builder; agents (Claude Code, Claude Desktop, Cursor, Copilot, Codex, Cline, ...) call them as MCP tools. Your real handler runs against your real state. **No browser automation, no scraping, no Playwright.**
+**Tesseron is an accessibility layer for AI agents.** You instrument your app once — the way you'd add ARIA to a web page — and any MCP-compatible agent can drive it through typed actions *you* define. Think of it as an API for agents, written by the people who built the app.
+
+The premise: the agent doesn't need to click a button, it needs to *do the thing the button does*. Say an agent wants to add five items to a list. Through the UI that's click **add**, type, submit, click **add** again — five round-trips through a brittle, re-render-happy interface. With Tesseron it calls one action:
+
+```ts
+addTodos(['buy milk', 'finish report', 'call mom', 'book flight', 'water plants'])
+```
+
+Your handler runs against your real state. No clicking, no scraping, no brittleness.
+
+Live applications (browser tabs, Electron/Tauri desktop apps, Node daemons, CLIs) declare actions with a Zod-style builder; agents (Claude Code, Claude Desktop, Cursor, Copilot, Codex, Cline, ...) call them as MCP tools. Your real handler runs in your real process, against your real state. **No browser automation, no scraping, no Playwright.**
+
+> **It's a protocol, not just a TypeScript library — and not just for the web.** The JS/TS SDKs are the reference implementation and already cover the browser, Node, and desktop (Electron/Tauri). But the wire protocol is [CC BY 4.0](#license) and language-agnostic: anything that can open a WebSocket and speak JSON-RPC 2.0 can host actions, so a Python daemon, a Rust desktop app, or a .NET line-of-business tool can speak it too. Web is simply where the first SDKs landed — not the boundary of what Tesseron is.
 
 <p align="center">
   <img src="./assets/diagrams/pieces-fit-together.png" alt="USER prompts the agent; YOUR APP (browser or Node, using @tesseron/web or /server) opens a loopback WebSocket and announces itself; the MCP GATEWAY (@tesseron/mcp) discovers it via ~/.tesseron/instances/ and dials in; the gateway bridges to the MCP CLIENT (Claude Code, Codex, OpenCode, Pi, Cursor, Claude Desktop, ...) over stdio." width="900">
