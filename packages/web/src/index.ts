@@ -7,9 +7,19 @@ import {
   type Transport,
   type WelcomeResult,
 } from '@tesseron/core';
+import {
+  DEFAULT_RESUME_STORAGE_KEY,
+  type ResumeStorage,
+  localStorageResumeBackend,
+} from './reactive-core.js';
 import { BrowserWebSocketTransport } from './transport.js';
 
 export * from '@tesseron/core';
+// The framework-neutral reactive core (connection controller, registration
+// helpers, resume storage, shared option/state types) is part of the public
+// `@tesseron/web` surface and is re-exported wholesale by the React/Svelte/Vue
+// adapters via their own `export * from '@tesseron/web'`.
+export * from './reactive-core.js';
 export { BrowserWebSocketTransport } from './transport.js';
 
 /**
@@ -22,22 +32,6 @@ export const DEFAULT_GATEWAY_URL =
   typeof location !== 'undefined'
     ? `${location.origin.replace(/^http/, 'ws')}/@tesseron/ws`
     : 'ws://localhost:5173/@tesseron/ws';
-
-/**
- * Persistence backend for resume credentials. Implementations may be sync or
- * async; the SDK awaits each call. Returning `null` / `undefined` from `load`
- * means "no stored session, do a fresh hello." Throws from any method are
- * non-fatal: the SDK treats them like an empty backend (load) or a silent
- * no-op (save/clear) so storage problems can't fail-close the connection.
- */
-export interface ResumeStorage {
-  load: () => ResumeCredentials | null | undefined | Promise<ResumeCredentials | null | undefined>;
-  save: (credentials: ResumeCredentials) => void | Promise<void>;
-  clear: () => void | Promise<void>;
-}
-
-/** Default `localStorage` key used when {@link WebConnectOptions.resume} is omitted or `true`. */
-export const DEFAULT_RESUME_STORAGE_KEY = 'tesseron:resume';
 
 /**
  * Options to {@link WebTesseronClient.connect}. Extends the protocol-level
@@ -253,47 +247,6 @@ function isResumeCredentials(x: unknown): x is ResumeCredentials {
     typeof (x as Record<string, unknown>)['sessionId'] === 'string' &&
     typeof (x as Record<string, unknown>)['resumeToken'] === 'string'
   );
-}
-
-function localStorageResumeBackend(key: string): ResumeStorage {
-  return {
-    load: () => {
-      // SSR: no window, nothing to load.
-      if (typeof window === 'undefined') return null;
-      try {
-        const raw = window.localStorage.getItem(key);
-        if (!raw) return null;
-        const parsed: unknown = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          const obj = parsed as Record<string, unknown>;
-          if (typeof obj['sessionId'] === 'string' && typeof obj['resumeToken'] === 'string') {
-            return { sessionId: obj['sessionId'], resumeToken: obj['resumeToken'] };
-          }
-        }
-        return null;
-      } catch {
-        // Corrupted entry or localStorage access denied (private mode, etc.)
-        // — treat as no saved session and let the SDK do a fresh hello.
-        return null;
-      }
-    },
-    save: (creds) => {
-      if (typeof window === 'undefined') return;
-      try {
-        window.localStorage.setItem(key, JSON.stringify(creds));
-      } catch {
-        // Quota exceeded or storage disabled — non-fatal.
-      }
-    },
-    clear: () => {
-      if (typeof window === 'undefined') return;
-      try {
-        window.localStorage.removeItem(key);
-      } catch {
-        // Same as save: best-effort cleanup.
-      }
-    },
-  };
 }
 
 function normalizeResume(option: WebConnectOptions['resume']): {
