@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tesseron session resume - how the new pairing flow works</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --dgm-bg-page: #f8fafc;
+      --dgm-bg-figure: #ffffff;
+      --dgm-grid: rgba(148, 163, 184, 0.35);
+      --dgm-border: #cbd5e1;
+      --dgm-shadow-color: #0f172a;
+
+      --dgm-card-neutral-1: #ffffff;
+      --dgm-card-neutral-2: #f1f5f9;
+      --dgm-card-accent-1: #fffdf7;
+      --dgm-card-accent-2: #fef3c7;
+      --dgm-card-danger-1: #fef2f2;
+      --dgm-card-danger-2: #fee2e2;
+
+      --dgm-accent-border-1: #fbbf24;
+      --dgm-accent-border-2: #d97706;
+      --dgm-danger-border-1: #f87171;
+      --dgm-danger-border-2: #b91c1c;
+
+      --dgm-accent: #f59e0b;
+      --dgm-accent-text: #b45309;
+      --dgm-danger: #dc2626;
+      --dgm-danger-text: #b91c1c;
+
+      --dgm-line: #94a3b8;
+      --dgm-line-strong: #64748b;
+      --dgm-text: #0f172a;
+      --dgm-text-muted: #475569;
+      --dgm-icon: #64748b;
+
+      --dgm-pill-bg: #ffffff;
+      --dgm-pill-border: #e2e8f0;
+      --dgm-pill-text: #334155;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --dgm-bg-page: #060a13;
+        --dgm-bg-figure: #0b1220;
+        --dgm-grid: rgba(51, 65, 85, 0.55);
+        --dgm-border: #334155;
+        --dgm-shadow-color: #000000;
+
+        --dgm-card-neutral-1: #172033;
+        --dgm-card-neutral-2: #0f172a;
+        --dgm-card-accent-1: #2a1f0a;
+        --dgm-card-accent-2: #1c1407;
+        --dgm-card-danger-1: #2a0f0f;
+        --dgm-card-danger-2: #1c0a0a;
+
+        --dgm-accent-border-1: #fcd34d;
+        --dgm-accent-border-2: #d97706;
+        --dgm-danger-border-1: #fca5a5;
+        --dgm-danger-border-2: #b91c1c;
+
+        --dgm-accent-text: #fcd34d;
+        --dgm-danger-text: #fca5a5;
+
+        --dgm-line: #64748b;
+        --dgm-line-strong: #cbd5e1;
+        --dgm-text: #e2e8f0;
+        --dgm-text-muted: #94a3b8;
+        --dgm-icon: #94a3b8;
+
+        --dgm-pill-bg: #0f172a;
+        --dgm-pill-border: #334155;
+        --dgm-pill-text: #cbd5e1;
+      }
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--dgm-bg-page);
+      color: var(--dgm-text);
+      padding: 2.5rem 2rem 3rem;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    .header { margin-bottom: 1.75rem; }
+    .header-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+    .pulse-dot {
+      width: 10px; height: 10px; background: var(--dgm-accent);
+      border-radius: 50%; animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    h1 { font-size: 1.65rem; font-weight: 700; letter-spacing: -0.02em; }
+    .subtitle { color: var(--dgm-text-muted); font-size: 0.95rem; margin-left: 1.45rem; max-width: 60ch; }
+    .version-tag {
+      display: inline-block;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border: 1px solid var(--dgm-accent);
+      color: var(--dgm-accent-text);
+      border-radius: 4px;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+    }
+
+    .lead {
+      background: var(--dgm-bg-figure);
+      border: 1px solid var(--dgm-border);
+      border-radius: 14px;
+      padding: 1.1rem 1.4rem;
+      margin: 1.5rem 0 2.5rem;
+      font-size: 0.95rem;
+      color: var(--dgm-text-muted);
+    }
+    .lead strong { color: var(--dgm-text); font-weight: 600; }
+    .lead .accent-emph { color: var(--dgm-accent-text); font-weight: 600; }
+
+    .scene { margin: 0 0 3rem; }
+    .scene-head { margin-bottom: 0.85rem; }
+    .scene-num {
+      display: inline-block;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--dgm-accent);
+      color: #1c1407;
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-align: center;
+      line-height: 28px;
+      margin-right: 0.7rem;
+      vertical-align: middle;
+    }
+    .scene-num.danger { background: var(--dgm-danger); color: #fff; }
+    .scene-title {
+      display: inline;
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      vertical-align: middle;
+    }
+    .scene-sub {
+      color: var(--dgm-text-muted);
+      font-size: 0.9rem;
+      margin: 0.35rem 0 0 2.45rem;
+      max-width: 70ch;
+    }
+
+    figure.dgm-figure {
+      margin: 0.85rem 0 1rem;
+      padding: 1rem 0.8rem 0.8rem;
+      border: 1px solid var(--dgm-border);
+      border-radius: 14px;
+      background: var(--dgm-bg-figure);
+    }
+    figure.dgm-figure .dgm-scroll { overflow-x: auto; }
+    figure.dgm-figure svg.dgm-svg {
+      display: block;
+      margin-inline: auto;
+      max-width: none;
+      height: auto;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+
+    .scene-notes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .scene-note {
+      font-size: 0.85rem;
+      color: var(--dgm-text-muted);
+      padding: 0.7rem 0.95rem;
+      border: 1px solid var(--dgm-border);
+      border-radius: 10px;
+      background: var(--dgm-bg-figure);
+    }
+    .scene-note strong { color: var(--dgm-text); font-weight: 600; }
+    .scene-note code {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.78rem;
+      background: var(--dgm-bg-page);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      color: var(--dgm-text);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .card {
+      background: var(--dgm-bg-figure);
+      border: 1px solid var(--dgm-border);
+      border-radius: 12px;
+      padding: 1.1rem 1.25rem;
+    }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.7rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.accent { background: var(--dgm-accent); }
+    .card-dot.neutral { background: var(--dgm-line); }
+    .card-dot.danger { background: var(--dgm-danger); }
+    .card h3 { font-size: 0.95rem; font-weight: 600; letter-spacing: -0.01em; }
+    .card ul { list-style: none; color: var(--dgm-text-muted); font-size: 0.85rem; }
+    .card li { margin-bottom: 0.45rem; padding-left: 0.85rem; position: relative; }
+    .card li::before { content: "+"; position: absolute; left: 0; color: var(--dgm-accent); font-weight: 700; }
+    .card.danger li::before { color: var(--dgm-danger); }
+    .card code {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.78rem;
+      background: var(--dgm-bg-page);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      color: var(--dgm-text);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 2.5rem;
+      color: var(--dgm-text-muted);
+      font-size: 0.75rem;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      opacity: 0.7;
+    }
+
+    /* Diagram text classes */
+    .dgm-title { font: 600 13.5px/1 Inter, sans-serif; letter-spacing: 0.08em; fill: var(--dgm-text); }
+    .dgm-title-accent { fill: var(--dgm-accent-text); }
+    .dgm-title-danger { fill: var(--dgm-danger-text); }
+    .dgm-sub { font: 400 12.5px/1 Inter, sans-serif; fill: var(--dgm-text-muted); }
+    .dgm-sub-accent { fill: var(--dgm-accent-text); opacity: 0.9; }
+    .dgm-code { font: 400 11.5px/1 "JetBrains Mono", monospace; fill: var(--dgm-text-muted); }
+    .dgm-code-accent { fill: var(--dgm-accent-text); }
+    .dgm-lbl { font: 500 12px/1 Inter, sans-serif; letter-spacing: 0.02em; fill: var(--dgm-pill-text); }
+    .dgm-lbl-accent { fill: var(--dgm-accent-text); }
+    .dgm-lbl-danger { fill: var(--dgm-danger-text); }
+    .dgm-step { font: 600 11.5px/1 Inter, sans-serif; fill: var(--dgm-text); }
+    .dgm-step-accent { fill: var(--dgm-accent-text); }
+    .dgm-step-danger { fill: var(--dgm-danger-text); }
+    .dgm-note { font: 500 12px/1.3 Inter, sans-serif; fill: var(--dgm-text); }
+    .dgm-note-mono { font: 400 11px/1.3 "JetBrains Mono", monospace; fill: var(--dgm-text-muted); }
+    .dgm-icon { stroke: var(--dgm-icon); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .dgm-icon-accent { stroke: var(--dgm-accent); }
+    .dgm-icon-danger { stroke: var(--dgm-danger); }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Tesseron session resume <span class="version-tag">v2.9.0</span></h1>
+      </div>
+      <p class="subtitle">
+        How a refresh keeps the same Tesseron session paired with the agent.
+        Four scenes, one accent color per scene, the technical names stay
+        visible.
+      </p>
+    </header>
+
+    <div class="lead">
+      <strong>The pitch.</strong> Before v2.9.0, every browser refresh minted a
+      new session, so the user had to read a new <code>claimCode</code> into
+      the agent each time. Now the <span class="accent-emph">Vite plugin
+      owns a Session by <code>sessionId</code></span>, not by browser
+      WebSocket. The browser tab can detach and reattach as many times as it
+      wants inside the idle TTL window (default 4 hours); the gateway-side
+      bridge never sees the disconnect; the agent stays paired.
+      <strong>One claim, many refreshes.</strong>
+    </div>
+
+
+    <!-- ---------------------------------------------------------------------
+         SCENE 1 - First connect (the only time the user does the claim dance)
+         Accent on the synthesised welcome carrying { sessionId, resumeToken,
+         claimCode } - that is the moment the Session is born and the only
+         time a claim code ever appears.
+         Canvas: 1200 x 540. Actor cards at y=20..140 (cx 180, 470, 760, 1050).
+         Lifelines y=140..510 dashed. Messages every 40 px from y=180.
+         --------------------------------------------------------------------- -->
+    <section class="scene">
+      <div class="scene-head">
+        <span class="scene-num">1</span>
+        <span class="scene-title">First connect - the only time the user types the claim code</span>
+        <p class="scene-sub">
+          The browser opens a WebSocket and sends <code>tesseron/hello</code>.
+          The Vite plugin mints a Session, synthesises the welcome
+          (which carries the <span style="color: var(--dgm-accent-text); font-weight: 600;">claim code</span>),
+          and writes the manifest. The user types the code into Claude; the
+          gateway dials with the bind subprotocol; the bridge is bound.
+        </p>
+      </div>
+
+      <figure class="dgm-figure">
+        <div class="dgm-scroll">
+          <svg class="dgm-svg" viewBox="0 0 1200 540" width="1200" height="540" role="img"
+               aria-label="Scene 1: first connect sequence diagram">
+
+            <defs>
+              <pattern id="dgm-dots" width="22" height="22" patternUnits="userSpaceOnUse">
+                <circle cx="1.2" cy="1.2" r="1.2" fill="var(--dgm-grid)"/>
+              </pattern>
+              <linearGradient id="dgm-card-neutral" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--dgm-card-neutral-1)"/>
+                <stop offset="1" stop-color="var(--dgm-card-neutral-2)"/>
+              </linearGradient>
+              <linearGradient id="dgm-card-accent" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--dgm-card-accent-1)"/>
+                <stop offset="1" stop-color="var(--dgm-card-accent-2)"/>
+              </linearGradient>
+              <linearGradient id="dgm-card-danger" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--dgm-card-danger-1)"/>
+                <stop offset="1" stop-color="var(--dgm-card-danger-2)"/>
+              </linearGradient>
+              <linearGradient id="dgm-border-accent" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--dgm-accent-border-1)"/>
+                <stop offset="1" stop-color="var(--dgm-accent-border-2)"/>
+              </linearGradient>
+              <linearGradient id="dgm-border-danger" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--dgm-danger-border-1)"/>
+                <stop offset="1" stop-color="var(--dgm-danger-border-2)"/>
+              </linearGradient>
+              <filter id="dgm-glow-accent" x="-30%" y="-60%" width="160%" height="220%">
+                <feGaussianBlur stdDeviation="14" result="b"/>
+                <feColorMatrix in="b" type="matrix"
+                  values="0 0 0 0 0.98   0 0 0 0 0.73   0 0 0 0 0.14   0 0 0 0.45 0"/>
+              </filter>
+              <filter id="dgm-glow-danger" x="-30%" y="-60%" width="160%" height="220%">
+                <feGaussianBlur stdDeviation="14" result="b"/>
+                <feColorMatrix in="b" type="matrix"
+                  values="0 0 0 0 0.86   0 0 0 0 0.15   0 0 0 0 0.15   0 0 0 0.45 0"/>
+              </filter>
+              <filter id="dgm-shadow" x="-10%" y="-10%" width="120%" height="130%">
+                <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="var(--dgm-shadow-color)" flood-opacity="0.06"/>
+                <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="var(--dgm-shadow-color)" flood-opacity="0.04"/>
+              </filter>
+            </defs>
+
+            <!-- Z1: background grid -->
+            <rect width="100%" height="100%" fill="url(#dgm-dots)"/>
+
+            <!-- Z2: actor cards (4) at top.
+                 Card x ranges: BROWSER 90..270 cx 180, PLUGIN 380..560 cx 470,
+                 GATEWAY 670..850 cx 760, AGENT 960..1140 cx 1050. -->
+            <g>
+              <rect x="90" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)"
+                    stroke-width="1.25" filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(170,36)">
+                <rect x="1" y="2" width="18" height="16" rx="2"/>
+                <path d="M1 6 H19"/>
+                <circle cx="4" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+                <circle cx="7" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+              </g>
+              <text x="180" y="80" text-anchor="middle" class="dgm-title">BROWSER</text>
+              <text x="180" y="104" text-anchor="middle" class="dgm-sub">tab + SDK</text>
+              <text x="180" y="124" text-anchor="middle" class="dgm-code">@tesseron/web</text>
+            </g>
+
+            <g>
+              <rect x="380" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)"
+                    stroke-width="1.25" filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(460,36)">
+                <path d="M3 7 H17"/><path d="M14 4 L18 7 L14 10"/>
+                <path d="M17 13 H3"/><path d="M6 10 L2 13 L6 16"/>
+              </g>
+              <text x="470" y="80" text-anchor="middle" class="dgm-title">VITE PLUGIN</text>
+              <text x="470" y="104" text-anchor="middle" class="dgm-sub">SessionManager</text>
+              <text x="470" y="124" text-anchor="middle" class="dgm-code">@tesseron/vite</text>
+            </g>
+
+            <g>
+              <rect x="670" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)"
+                    stroke-width="1.25" filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(750,36)">
+                <path d="M10 2 L17 5 V10 C17 14 14 17 10 19 C6 17 3 14 3 10 V5 Z"/>
+              </g>
+              <text x="760" y="80" text-anchor="middle" class="dgm-title">MCP GATEWAY</text>
+              <text x="760" y="104" text-anchor="middle" class="dgm-sub">stdio MCP bridge</text>
+              <text x="760" y="124" text-anchor="middle" class="dgm-code">@tesseron/mcp</text>
+            </g>
+
+            <g>
+              <rect x="960" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)"
+                    stroke-width="1.25" filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(1040,36)">
+                <path d="M10 1.5 L12 8 L18.5 10 L12 12 L10 18.5 L8 12 L1.5 10 L8 8 Z"/>
+              </g>
+              <text x="1050" y="80" text-anchor="middle" class="dgm-title">AGENT</text>
+              <text x="1050" y="104" text-anchor="middle" class="dgm-sub">Claude Code,</text>
+              <text x="1050" y="124" text-anchor="middle" class="dgm-code">Desktop, Cursor</text>
+            </g>
+
+            <!-- Z3: lifelines (dashed from y=140 to y=510) -->
+            <line x1="180" y1="140" x2="180" y2="510" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="470" y1="140" x2="470" y2="510" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="760" y1="140" x2="760" y2="510" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="1050" y1="140" x2="1050" y2="510" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+
+            <!-- Step 1: BROWSER -> PLUGIN  "WebSocket open"  y=180 -->
+            <line x1="180" y1="180" x2="460" y2="180" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="460,175 470,180 460,185" fill="var(--dgm-line-strong)"/>
+            <circle cx="180" cy="180" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="180" y="184" text-anchor="middle" class="dgm-step">1</text>
+            <rect x="280" y="169" width="90" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="325" y="184" text-anchor="middle" class="dgm-lbl">WebSocket open</text>
+
+            <!-- Step 2: BROWSER -> PLUGIN  "tesseron/hello"  y=220 -->
+            <line x1="180" y1="220" x2="460" y2="220" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="460,215 470,220 460,225" fill="var(--dgm-line-strong)"/>
+            <circle cx="180" cy="220" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="180" y="224" text-anchor="middle" class="dgm-step">2</text>
+            <rect x="285" y="209" width="80" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="325" y="224" text-anchor="middle" class="dgm-lbl">tesseron/hello</text>
+
+            <!-- Step 3: PLUGIN self-note (mints + writes manifest)  y=260
+                 Note box centered on PLUGIN lifeline. -->
+            <rect x="370" y="248" width="200" height="36" rx="6"
+                  fill="var(--dgm-card-neutral-2)" stroke="var(--dgm-border)" stroke-width="1"/>
+            <circle cx="380" cy="266" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="380" y="270" text-anchor="middle" class="dgm-step">3</text>
+            <text x="470" y="262" text-anchor="middle" class="dgm-note">mint { sessionId, resumeToken, claimCode }</text>
+            <text x="470" y="278" text-anchor="middle" class="dgm-note-mono">write ~/.tesseron/instances/&lt;id&gt;.json</text>
+
+            <!-- Step 4: PLUGIN -> BROWSER  welcome [ACCENT - this is the magic moment]  y=320 -->
+            <ellipse cx="325" cy="320" rx="120" ry="22" fill="var(--dgm-accent)" filter="url(#dgm-glow-accent)" opacity="0.33"/>
+            <polygon points="190,315 180,320 190,325" fill="var(--dgm-accent)"/>
+            <line x1="190" y1="320" x2="470" y2="320" stroke="var(--dgm-accent)" stroke-width="1.75" stroke-linecap="butt"/>
+            <circle cx="470" cy="320" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-accent)" stroke-width="1.5"/>
+            <text x="470" y="324" text-anchor="middle" class="dgm-step dgm-step-accent">4</text>
+            <rect x="246" y="309" width="160" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-accent)" stroke-width="1"/>
+            <text x="326" y="324" text-anchor="middle" class="dgm-lbl dgm-lbl-accent">welcome { claimCode AB3X-7K }</text>
+
+            <!-- Step 5: BROWSER self-note (persist to localStorage)  y=360 -->
+            <rect x="80" y="348" width="200" height="36" rx="6"
+                  fill="var(--dgm-card-neutral-2)" stroke="var(--dgm-border)" stroke-width="1"/>
+            <circle cx="90" cy="366" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="90" y="370" text-anchor="middle" class="dgm-step">5</text>
+            <text x="180" y="362" text-anchor="middle" class="dgm-note">save creds to localStorage</text>
+            <text x="180" y="378" text-anchor="middle" class="dgm-note-mono">tesseron:resume = { sid, rt }</text>
+
+            <!-- Step 6: AGENT -> GATEWAY  tesseron__claim_session('AB3X-7K')  y=410
+                 (user types the claim code into the agent off-band; not drawn,
+                 mentioned in scene-note below.) -->
+            <polygon points="780,405 770,410 780,415" fill="var(--dgm-line-strong)"/>
+            <line x1="780" y1="410" x2="1050" y2="410" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt"/>
+            <circle cx="1050" cy="410" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="1050" y="414" text-anchor="middle" class="dgm-step">6</text>
+            <rect x="826" y="399" width="178" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="915" y="414" text-anchor="middle" class="dgm-lbl">tesseron__claim_session</text>
+
+            <!-- Step 7: GATEWAY -> PLUGIN  dial w/ tesseron-bind.<code>  y=450 -->
+            <line x1="470" y1="450" x2="750" y2="450" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="480,445 470,450 480,455" fill="var(--dgm-line-strong)"/>
+            <circle cx="760" cy="450" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="760" y="454" text-anchor="middle" class="dgm-step">7</text>
+            <rect x="540" y="439" width="150" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="615" y="454" text-anchor="middle" class="dgm-lbl">dial tesseron-bind.code</text>
+
+            <!-- Step 8: PLUGIN  bridge bound (full-width activity)  y=490 -->
+            <rect x="380" y="478" width="660" height="24" rx="6"
+                  fill="var(--dgm-card-neutral-2)" stroke="var(--dgm-border)" stroke-width="1"/>
+            <circle cx="390" cy="490" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="390" y="494" text-anchor="middle" class="dgm-step">8</text>
+            <text x="710" y="494" text-anchor="middle" class="dgm-note">bind validated - cached hello replayed to gateway - bridge bound - agent attached</text>
+
+          </svg>
+        </div>
+      </figure>
+
+      <div class="scene-notes">
+        <p class="scene-note"><strong>Out of band, between 5 and 6.</strong>
+          The browser UI shows the claim code (e.g. <code>AB3X-7K</code>).
+          The user reads it and types <em>"claim session AB3X-7K"</em> into
+          Claude. This is the only human step; everything else is automatic.</p>
+        <p class="scene-note"><strong>What is now persisted.</strong>
+          The Session lives in the Vite plugin's memory keyed by
+          <code>sessionId</code>. The browser holds
+          <code>{ sessionId, resumeToken }</code> in
+          <code>localStorage</code>. The manifest sits in
+          <code>~/.tesseron/instances/&lt;instanceId&gt;.json</code>.</p>
+      </div>
+    </section>
+
+
+    <!-- ---------------------------------------------------------------------
+         SCENE 2 - Page refresh. Browser-side WS dies. Session stays alive in
+         memory; the gateway-side bridge stays open. Accent on the Session.
+         Canvas: 1200 x 410.
+         --------------------------------------------------------------------- -->
+    <section class="scene">
+      <div class="scene-head">
+        <span class="scene-num">2</span>
+        <span class="scene-title">Page refresh - the Session survives the dead WebSocket</span>
+        <p class="scene-sub">
+          The browser navigates away. Its WebSocket closes. The plugin
+          detaches the browser WS from the Session but
+          <span style="color: var(--dgm-accent-text); font-weight: 600;">keeps the Session alive</span>
+          for the idle TTL window (default 4 hours). The gateway never sees
+          a close - the bridge stays open.
+        </p>
+      </div>
+
+      <figure class="dgm-figure">
+        <div class="dgm-scroll">
+          <svg class="dgm-svg" viewBox="0 0 1200 410" width="1200" height="410" role="img"
+               aria-label="Scene 2: page refresh sequence diagram">
+
+            <defs>
+              <pattern id="dgm-dots-2" width="22" height="22" patternUnits="userSpaceOnUse">
+                <circle cx="1.2" cy="1.2" r="1.2" fill="var(--dgm-grid)"/>
+              </pattern>
+            </defs>
+
+            <rect width="100%" height="100%" fill="url(#dgm-dots-2)"/>
+
+            <!-- Actor cards - same positions as Scene 1.
+                 PLUGIN is the accent in this scene (it owns the Session). -->
+            <g>
+              <rect x="90" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    opacity="0.55"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(170,36)" opacity="0.55">
+                <rect x="1" y="2" width="18" height="16" rx="2"/>
+                <path d="M1 6 H19"/>
+                <circle cx="4" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+                <circle cx="7" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+              </g>
+              <text x="180" y="80" text-anchor="middle" class="dgm-title" opacity="0.6">BROWSER (gone)</text>
+              <text x="180" y="104" text-anchor="middle" class="dgm-sub" opacity="0.6">tab navigated away</text>
+              <text x="180" y="124" text-anchor="middle" class="dgm-code" opacity="0.6">WS closed</text>
+            </g>
+
+            <!-- Accent glow behind PLUGIN -->
+            <ellipse cx="470" cy="80" rx="108" ry="84" fill="var(--dgm-accent)" filter="url(#dgm-glow-accent)" opacity="0.33"/>
+            <g>
+              <rect x="380" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-accent)" stroke="url(#dgm-border-accent)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon dgm-icon-accent" transform="translate(460,36)">
+                <rect x="3" y="9" width="14" height="10" rx="2"/>
+                <path d="M6 9 V6 a4 4 0 0 1 8 0 V9"/>
+              </g>
+              <text x="470" y="80" text-anchor="middle" class="dgm-title dgm-title-accent">SESSION (held)</text>
+              <text x="470" y="104" text-anchor="middle" class="dgm-sub dgm-sub-accent">SessionManager keeps it</text>
+              <text x="470" y="124" text-anchor="middle" class="dgm-code dgm-code-accent">idle TTL 4h running</text>
+            </g>
+
+            <g>
+              <rect x="670" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(750,36)">
+                <path d="M10 2 L17 5 V10 C17 14 14 17 10 19 C6 17 3 14 3 10 V5 Z"/>
+              </g>
+              <text x="760" y="80" text-anchor="middle" class="dgm-title">MCP GATEWAY</text>
+              <text x="760" y="104" text-anchor="middle" class="dgm-sub">bridge still open</text>
+              <text x="760" y="124" text-anchor="middle" class="dgm-code">no disconnect seen</text>
+            </g>
+
+            <g>
+              <rect x="960" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(1040,36)">
+                <path d="M10 1.5 L12 8 L18.5 10 L12 12 L10 18.5 L8 12 L1.5 10 L8 8 Z"/>
+              </g>
+              <text x="1050" y="80" text-anchor="middle" class="dgm-title">AGENT</text>
+              <text x="1050" y="104" text-anchor="middle" class="dgm-sub">still paired,</text>
+              <text x="1050" y="124" text-anchor="middle" class="dgm-code">unaware</text>
+            </g>
+
+            <!-- Lifelines.  BROWSER lifeline ends early (the X). -->
+            <line x1="180" y1="140" x2="180" y2="220" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.4"/>
+            <line x1="470" y1="140" x2="470" y2="380" stroke="var(--dgm-accent)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="760" y1="140" x2="760" y2="380" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="1050" y1="140" x2="1050" y2="380" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+
+            <!-- X marker where browser lifeline ends -->
+            <line x1="170" y1="215" x2="190" y2="230" stroke="var(--dgm-line-strong)" stroke-width="2" stroke-linecap="round"/>
+            <line x1="190" y1="215" x2="170" y2="230" stroke="var(--dgm-line-strong)" stroke-width="2" stroke-linecap="round"/>
+
+            <!-- Step 1: user refreshes (note above browser lifeline)  y=190 -->
+            <rect x="80" y="178" width="200" height="24" rx="6"
+                  fill="var(--dgm-card-neutral-2)" stroke="var(--dgm-border)" stroke-width="1"/>
+            <circle cx="90" cy="190" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="90" y="194" text-anchor="middle" class="dgm-step">1</text>
+            <text x="190" y="194" text-anchor="middle" class="dgm-note">user hits refresh</text>
+
+            <!-- Step 2: WebSocket close BROWSER -> PLUGIN  y=255 -->
+            <line x1="200" y1="255" x2="460" y2="255" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt" stroke-dasharray="4 3" opacity="0.7"/>
+            <polygon points="460,250 470,255 460,260" fill="var(--dgm-line-strong)" opacity="0.7"/>
+            <circle cx="200" cy="255" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="200" y="259" text-anchor="middle" class="dgm-step">2</text>
+            <rect x="280" y="244" width="100" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="330" y="259" text-anchor="middle" class="dgm-lbl">WS close 1001</text>
+
+            <!-- Step 3: PLUGIN self-note  start idle TTL  y=305 [ACCENT] -->
+            <rect x="370" y="293" width="200" height="36" rx="6"
+                  fill="var(--dgm-card-accent-1)" stroke="var(--dgm-accent)" stroke-width="1"/>
+            <circle cx="380" cy="311" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-accent)" stroke-width="1.5"/>
+            <text x="380" y="315" text-anchor="middle" class="dgm-step dgm-step-accent">3</text>
+            <text x="470" y="307" text-anchor="middle" class="dgm-note dgm-title-accent">detach browser WS from Session</text>
+            <text x="470" y="323" text-anchor="middle" class="dgm-note-mono">start idleTimer = 4h (sessionIdleTtlMs)</text>
+
+            <!-- Step 4: PLUGIN <-> GATEWAY still open (bidirectional, neutral but emphasised)  y=360 -->
+            <polygon points="486,355 476,360 486,365" fill="var(--dgm-line-strong)"/>
+            <line x1="486" y1="360" x2="744" y2="360" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="744,355 754,360 744,365" fill="var(--dgm-line-strong)"/>
+            <circle cx="380" cy="360" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="380" y="364" text-anchor="middle" class="dgm-step">4</text>
+            <rect x="560" y="349" width="110" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="615" y="364" text-anchor="middle" class="dgm-lbl">bridge open</text>
+
+          </svg>
+        </div>
+      </figure>
+
+      <div class="scene-notes">
+        <p class="scene-note"><strong>Why the gateway sees nothing.</strong>
+          The gateway's WebSocket connection lives between the
+          <em>gateway and the plugin</em>, not the gateway and the browser.
+          When the browser tab closes, only one half of the bridge dies.
+          The plugin is still alive in the dev server process; the bridge to
+          the gateway is still alive.</p>
+        <p class="scene-note"><strong>Configurable.</strong>
+          The 4-hour default matches <code>@tesseron/mcp</code>'s
+          <code>resumeTtlMs</code>. Override on the plugin with
+          <code>tesseron({ sessionIdleTtlMs: ... })</code>;
+          <code>0</code> disables cross-refresh resume entirely.</p>
+      </div>
+    </section>
+
+
+    <!-- ---------------------------------------------------------------------
+         SCENE 3 - Reconnect. New WS opens, sends tesseron/resume.
+         SessionManager matches, rotates token, attaches. Accent on the
+         resume response (the moment the user does NOT see a new claim code).
+         Canvas: 1200 x 500.
+         --------------------------------------------------------------------- -->
+    <section class="scene">
+      <div class="scene-head">
+        <span class="scene-num">3</span>
+        <span class="scene-title">Reconnect - resume, no claim code</span>
+        <p class="scene-sub">
+          The page mounts again, a new WebSocket opens, the SDK sends
+          <code>tesseron/resume</code> with the stored credentials. The plugin
+          looks up the Session by <code>sessionId</code>, constant-time
+          compares the token, rotates it, and synthesises a resume response
+          <span style="color: var(--dgm-accent-text); font-weight: 600;">without a new claim code</span>.
+          The agent never noticed.
+        </p>
+      </div>
+
+      <figure class="dgm-figure">
+        <div class="dgm-scroll">
+          <svg class="dgm-svg" viewBox="0 0 1200 500" width="1200" height="500" role="img"
+               aria-label="Scene 3: reconnect via resume sequence diagram">
+
+            <defs>
+              <pattern id="dgm-dots-3" width="22" height="22" patternUnits="userSpaceOnUse">
+                <circle cx="1.2" cy="1.2" r="1.2" fill="var(--dgm-grid)"/>
+              </pattern>
+            </defs>
+
+            <rect width="100%" height="100%" fill="url(#dgm-dots-3)"/>
+
+            <!-- BROWSER (now back, fresh) -->
+            <g>
+              <rect x="90" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(170,36)">
+                <rect x="1" y="2" width="18" height="16" rx="2"/>
+                <path d="M1 6 H19"/>
+                <circle cx="4" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+                <circle cx="7" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+              </g>
+              <text x="180" y="80" text-anchor="middle" class="dgm-title">BROWSER</text>
+              <text x="180" y="104" text-anchor="middle" class="dgm-sub">fresh tab</text>
+              <text x="180" y="124" text-anchor="middle" class="dgm-code">creds from localStorage</text>
+            </g>
+
+            <!-- VITE PLUGIN (accent in this scene) -->
+            <ellipse cx="470" cy="80" rx="108" ry="84" fill="var(--dgm-accent)" filter="url(#dgm-glow-accent)" opacity="0.33"/>
+            <g>
+              <rect x="380" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-accent)" stroke="url(#dgm-border-accent)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon dgm-icon-accent" transform="translate(460,36)">
+                <path d="M3 7 H17"/><path d="M14 4 L18 7 L14 10"/>
+                <path d="M17 13 H3"/><path d="M6 10 L2 13 L6 16"/>
+              </g>
+              <text x="470" y="80" text-anchor="middle" class="dgm-title dgm-title-accent">VITE PLUGIN</text>
+              <text x="470" y="104" text-anchor="middle" class="dgm-sub dgm-sub-accent">SessionManager re-attach</text>
+              <text x="470" y="124" text-anchor="middle" class="dgm-code dgm-code-accent">@tesseron/vite</text>
+            </g>
+
+            <g>
+              <rect x="670" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(750,36)">
+                <path d="M10 2 L17 5 V10 C17 14 14 17 10 19 C6 17 3 14 3 10 V5 Z"/>
+              </g>
+              <text x="760" y="80" text-anchor="middle" class="dgm-title">MCP GATEWAY</text>
+              <text x="760" y="104" text-anchor="middle" class="dgm-sub">same bridge,</text>
+              <text x="760" y="124" text-anchor="middle" class="dgm-code">no re-dial</text>
+            </g>
+
+            <g>
+              <rect x="960" y="20" width="180" height="120" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(1040,36)">
+                <path d="M10 1.5 L12 8 L18.5 10 L12 12 L10 18.5 L8 12 L1.5 10 L8 8 Z"/>
+              </g>
+              <text x="1050" y="80" text-anchor="middle" class="dgm-title">AGENT</text>
+              <text x="1050" y="104" text-anchor="middle" class="dgm-sub">same session,</text>
+              <text x="1050" y="124" text-anchor="middle" class="dgm-code">no re-claim</text>
+            </g>
+
+            <!-- Lifelines -->
+            <line x1="180" y1="140" x2="180" y2="470" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="470" y1="140" x2="470" y2="470" stroke="var(--dgm-accent)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="760" y1="140" x2="760" y2="470" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="1050" y1="140" x2="1050" y2="470" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+
+            <!-- Step 1: BROWSER -> PLUGIN  WebSocket open  y=180 -->
+            <line x1="180" y1="180" x2="460" y2="180" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="460,175 470,180 460,185" fill="var(--dgm-line-strong)"/>
+            <circle cx="180" cy="180" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="180" y="184" text-anchor="middle" class="dgm-step">1</text>
+            <rect x="280" y="169" width="90" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="325" y="184" text-anchor="middle" class="dgm-lbl">WebSocket open</text>
+
+            <!-- Step 2: BROWSER -> PLUGIN  tesseron/resume { sessionId, resumeToken }  y=220 -->
+            <line x1="180" y1="220" x2="460" y2="220" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="460,215 470,220 460,225" fill="var(--dgm-line-strong)"/>
+            <circle cx="180" cy="220" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="180" y="224" text-anchor="middle" class="dgm-step">2</text>
+            <rect x="240" y="209" width="190" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="335" y="224" text-anchor="middle" class="dgm-lbl">tesseron/resume { sid, rt }</text>
+
+            <!-- Step 3: PLUGIN self-note  lookup + compare  y=265 -->
+            <rect x="370" y="253" width="200" height="36" rx="6"
+                  fill="var(--dgm-card-accent-1)" stroke="var(--dgm-accent)" stroke-width="1"/>
+            <circle cx="380" cy="271" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-accent)" stroke-width="1.5"/>
+            <text x="380" y="275" text-anchor="middle" class="dgm-step dgm-step-accent">3</text>
+            <text x="470" y="267" text-anchor="middle" class="dgm-note dgm-title-accent">SessionManager.getBySession(sid)</text>
+            <text x="470" y="283" text-anchor="middle" class="dgm-note-mono">constantTimeEqual(rt, session.rt) - MATCH</text>
+
+            <!-- Step 4: PLUGIN self-note  cancel timer + rotate + attach  y=320 -->
+            <rect x="370" y="308" width="200" height="36" rx="6"
+                  fill="var(--dgm-card-accent-1)" stroke="var(--dgm-accent)" stroke-width="1"/>
+            <circle cx="380" cy="326" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-accent)" stroke-width="1.5"/>
+            <text x="380" y="330" text-anchor="middle" class="dgm-step dgm-step-accent">4</text>
+            <text x="470" y="322" text-anchor="middle" class="dgm-note dgm-title-accent">cancel idleTimer - rotate resumeToken</text>
+            <text x="470" y="338" text-anchor="middle" class="dgm-note-mono">attach new browser WS to existing Session</text>
+
+            <!-- Step 5: PLUGIN -> BROWSER  resume response (NO claim code)  y=380 [ACCENT MOMENT] -->
+            <ellipse cx="325" cy="380" rx="130" ry="22" fill="var(--dgm-accent)" filter="url(#dgm-glow-accent)" opacity="0.33"/>
+            <polygon points="190,375 180,380 190,385" fill="var(--dgm-accent)"/>
+            <line x1="190" y1="380" x2="470" y2="380" stroke="var(--dgm-accent)" stroke-width="1.75" stroke-linecap="butt"/>
+            <circle cx="470" cy="380" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-accent)" stroke-width="1.5"/>
+            <text x="470" y="384" text-anchor="middle" class="dgm-step dgm-step-accent">5</text>
+            <rect x="226" y="369" width="200" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-accent)" stroke-width="1"/>
+            <text x="326" y="384" text-anchor="middle" class="dgm-lbl dgm-lbl-accent">resume result { sid, NEW rt }</text>
+
+            <!-- Step 6: BROWSER self-note  persist rotated token  y=425 -->
+            <rect x="80" y="413" width="200" height="36" rx="6"
+                  fill="var(--dgm-card-neutral-2)" stroke="var(--dgm-border)" stroke-width="1"/>
+            <circle cx="90" cy="431" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="90" y="435" text-anchor="middle" class="dgm-step">6</text>
+            <text x="180" y="427" text-anchor="middle" class="dgm-note">save rotated token</text>
+            <text x="180" y="443" text-anchor="middle" class="dgm-note-mono">tesseron:resume = { sid, NEW rt }</text>
+
+          </svg>
+        </div>
+      </figure>
+
+      <div class="scene-notes">
+        <p class="scene-note"><strong>What the agent saw.</strong>
+          Nothing. Its tool list never changed; no
+          <code>tools/list_changed</code> notification fired. As far as the
+          MCP side is concerned, the same session has been continuously
+          claimed since Scene 1.</p>
+        <p class="scene-note"><strong>Why rotate the token.</strong>
+          Resume tokens are single-shot. A second resume with the same token
+          would fail. This protects against token replay if the previous
+          token leaked somewhere (e.g. shared between two tabs).</p>
+      </div>
+    </section>
+
+
+    <!-- ---------------------------------------------------------------------
+         SCENE 4 - Failure paths. Two of them:
+         (A) Idle TTL elapses, Session destroyed.
+         (B) Bad resume token, ResumeFailed, SDK falls back to fresh hello.
+         Danger color used here; only place in the whole document.
+         Canvas: 1200 x 540 (two stacked mini-sequences).
+         --------------------------------------------------------------------- -->
+    <section class="scene">
+      <div class="scene-head">
+        <span class="scene-num danger">!</span>
+        <span class="scene-title">Failure paths - the safety net</span>
+        <p class="scene-sub">
+          Two ways the resume path can not happen: the idle TTL elapses
+          without a reattach, or the SDK comes back with a stale token.
+          Both fall through cleanly to a fresh
+          <code>tesseron/hello</code> - the user just sees a new claim code,
+          same as Scene 1.
+        </p>
+      </div>
+
+      <figure class="dgm-figure">
+        <div class="dgm-scroll">
+          <svg class="dgm-svg" viewBox="0 0 1200 540" width="1200" height="540" role="img"
+               aria-label="Scene 4: failure paths sequence diagram">
+
+            <defs>
+              <pattern id="dgm-dots-4" width="22" height="22" patternUnits="userSpaceOnUse">
+                <circle cx="1.2" cy="1.2" r="1.2" fill="var(--dgm-grid)"/>
+              </pattern>
+            </defs>
+
+            <rect width="100%" height="100%" fill="url(#dgm-dots-4)"/>
+
+            <!-- ----- Path A: idle TTL elapses ----- -->
+
+            <!-- Header pill -->
+            <rect x="40" y="20" width="220" height="28" rx="8"
+                  fill="var(--dgm-card-danger-1)" stroke="var(--dgm-danger)" stroke-width="1"/>
+            <text x="150" y="38" text-anchor="middle" class="dgm-title dgm-title-danger">PATH A - IDLE TIMEOUT</text>
+            <text x="280" y="38" class="dgm-note">no browser reattach within 4h</text>
+
+            <!-- Three actors for Path A: PLUGIN, GATEWAY, AGENT (no BROWSER - it's gone for good) -->
+            <g>
+              <rect x="40" y="70" width="180" height="100" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(120,86)">
+                <path d="M3 7 H17"/><path d="M14 4 L18 7 L14 10"/>
+                <path d="M17 13 H3"/><path d="M6 10 L2 13 L6 16"/>
+              </g>
+              <text x="130" y="130" text-anchor="middle" class="dgm-title">VITE PLUGIN</text>
+              <text x="130" y="154" text-anchor="middle" class="dgm-code">Session (idle)</text>
+            </g>
+
+            <g>
+              <rect x="380" y="70" width="180" height="100" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(460,86)">
+                <path d="M10 2 L17 5 V10 C17 14 14 17 10 19 C6 17 3 14 3 10 V5 Z"/>
+              </g>
+              <text x="470" y="130" text-anchor="middle" class="dgm-title">MCP GATEWAY</text>
+              <text x="470" y="154" text-anchor="middle" class="dgm-code">bridge open</text>
+            </g>
+
+            <g>
+              <rect x="720" y="70" width="180" height="100" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(800,86)">
+                <path d="M10 1.5 L12 8 L18.5 10 L12 12 L10 18.5 L8 12 L1.5 10 L8 8 Z"/>
+              </g>
+              <text x="810" y="130" text-anchor="middle" class="dgm-title">AGENT</text>
+              <text x="810" y="154" text-anchor="middle" class="dgm-code">paired, will be notified</text>
+            </g>
+
+            <!-- Lifelines for Path A (y=170..260) -->
+            <line x1="130" y1="170" x2="130" y2="260" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="470" y1="170" x2="470" y2="260" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+            <line x1="810" y1="170" x2="810" y2="260" stroke="var(--dgm-line)" stroke-width="1.25" stroke-dasharray="3 5" opacity="0.55"/>
+
+            <!-- Path A Step 1: PLUGIN self-note (timer fires)  y=210 -->
+            <rect x="30" y="198" width="200" height="36" rx="6"
+                  fill="var(--dgm-card-danger-1)" stroke="var(--dgm-danger)" stroke-width="1"/>
+            <circle cx="40" cy="216" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-danger)" stroke-width="1.5"/>
+            <text x="40" y="220" text-anchor="middle" class="dgm-step dgm-step-danger">1</text>
+            <text x="130" y="212" text-anchor="middle" class="dgm-note dgm-title-danger">idleTimer fires</text>
+            <text x="130" y="228" text-anchor="middle" class="dgm-note-mono">SessionManager.destroy(session)</text>
+
+            <!-- Path A Step 2: PLUGIN -> GATEWAY  WS close  y=255 -->
+            <line x1="140" y1="255" x2="460" y2="255" stroke="var(--dgm-danger)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="460,250 470,255 460,260" fill="var(--dgm-danger)"/>
+            <circle cx="140" cy="255" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-danger)" stroke-width="1.5"/>
+            <text x="140" y="259" text-anchor="middle" class="dgm-step dgm-step-danger">2</text>
+            <rect x="225" y="244" width="170" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-danger)" stroke-width="1"/>
+            <text x="310" y="259" text-anchor="middle" class="dgm-lbl dgm-lbl-danger">close + delete manifest</text>
+
+            <!-- Path A Step 3: GATEWAY -> AGENT  tools/list_changed  y=295 -->
+            <line x1="480" y1="295" x2="800" y2="295" stroke="var(--dgm-danger)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="800,290 810,295 800,300" fill="var(--dgm-danger)"/>
+            <circle cx="480" cy="295" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-danger)" stroke-width="1.5"/>
+            <text x="480" y="299" text-anchor="middle" class="dgm-step dgm-step-danger">3</text>
+            <rect x="568" y="284" width="140" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-danger)" stroke-width="1"/>
+            <text x="638" y="299" text-anchor="middle" class="dgm-lbl dgm-lbl-danger">tools/list_changed</text>
+
+            <!-- Divider -->
+            <line x1="40" y1="330" x2="1140" y2="330" stroke="var(--dgm-border)" stroke-width="1" stroke-dasharray="6 4" opacity="0.7"/>
+
+            <!-- ----- Path B: bad / stale resume token ----- -->
+
+            <rect x="40" y="350" width="220" height="28" rx="8"
+                  fill="var(--dgm-card-danger-1)" stroke="var(--dgm-danger)" stroke-width="1"/>
+            <text x="150" y="368" text-anchor="middle" class="dgm-title dgm-title-danger">PATH B - STALE TOKEN</text>
+            <text x="280" y="368" class="dgm-note">resume after Session was destroyed</text>
+
+            <!-- Three actors for Path B: BROWSER, PLUGIN, BROWSER's localStorage (note) -->
+            <g>
+              <rect x="40" y="395" width="180" height="100" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(120,411)">
+                <rect x="1" y="2" width="18" height="16" rx="2"/>
+                <path d="M1 6 H19"/>
+                <circle cx="4" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+                <circle cx="7" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+              </g>
+              <text x="130" y="455" text-anchor="middle" class="dgm-title">BROWSER</text>
+              <text x="130" y="479" text-anchor="middle" class="dgm-code">stale rt in storage</text>
+            </g>
+
+            <g>
+              <rect x="380" y="395" width="180" height="100" rx="14"
+                    fill="url(#dgm-card-neutral)" stroke="var(--dgm-border)" stroke-width="1.25"
+                    filter="url(#dgm-shadow)"/>
+              <g class="dgm-icon" transform="translate(460,411)">
+                <path d="M3 7 H17"/><path d="M14 4 L18 7 L14 10"/>
+                <path d="M17 13 H3"/><path d="M6 10 L2 13 L6 16"/>
+              </g>
+              <text x="470" y="455" text-anchor="middle" class="dgm-title">VITE PLUGIN</text>
+              <text x="470" y="479" text-anchor="middle" class="dgm-code">no matching Session</text>
+            </g>
+
+            <!-- Lifelines for Path B (y=495..515 only - tight) -->
+
+            <!-- Path B Step 1: BROWSER -> PLUGIN  tesseron/resume { stale rt }  y=515 -->
+            <line x1="140" y1="515" x2="460" y2="515" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="460,510 470,515 460,520" fill="var(--dgm-line-strong)"/>
+            <circle cx="140" cy="515" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-line-strong)" stroke-width="1.5"/>
+            <text x="140" y="519" text-anchor="middle" class="dgm-step">1</text>
+            <rect x="220" y="504" width="170" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="305" y="519" text-anchor="middle" class="dgm-lbl">tesseron/resume (stale)</text>
+
+            <!-- Path B Step 2-3: PLUGIN responds + BROWSER falls back (compact horizontal flow) -->
+            <!-- Show step 2 to the right of plugin: ResumeFailed back -->
+            <polygon points="586,510 576,515 586,520" fill="var(--dgm-danger)"/>
+            <line x1="586" y1="515" x2="720" y2="515" stroke="var(--dgm-danger)" stroke-width="1.75" stroke-linecap="butt"/>
+            <rect x="600" y="504" width="105" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-danger)" stroke-width="1"/>
+            <text x="652" y="519" text-anchor="middle" class="dgm-lbl dgm-lbl-danger">ResumeFailed</text>
+            <circle cx="720" cy="515" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-danger)" stroke-width="1.5"/>
+            <text x="720" y="519" text-anchor="middle" class="dgm-step dgm-step-danger">2</text>
+
+            <!-- Step 3: arrow continues to a "FRESH HELLO" outcome card on the far right -->
+            <line x1="730" y1="515" x2="950" y2="515" stroke="var(--dgm-line-strong)" stroke-width="1.75" stroke-linecap="butt"/>
+            <polygon points="950,510 960,515 950,520" fill="var(--dgm-line-strong)"/>
+            <rect x="755" y="504" width="170" height="22" rx="7" fill="var(--dgm-pill-bg)" stroke="var(--dgm-pill-border)" stroke-width="1"/>
+            <text x="840" y="519" text-anchor="middle" class="dgm-lbl">clear storage + retry</text>
+
+            <!-- Outcome card: back to Scene 1 -->
+            <rect x="970" y="395" width="180" height="100" rx="14"
+                  fill="url(#dgm-card-accent)" stroke="url(#dgm-border-accent)" stroke-width="1.25"
+                  filter="url(#dgm-shadow)"/>
+            <g class="dgm-icon dgm-icon-accent" transform="translate(1050,411)">
+              <path d="M10 2 L17 5 V10 C17 14 14 17 10 19 C6 17 3 14 3 10 V5 Z"/>
+            </g>
+            <text x="1060" y="455" text-anchor="middle" class="dgm-title dgm-title-accent">FRESH HELLO</text>
+            <text x="1060" y="479" text-anchor="middle" class="dgm-code dgm-code-accent">back to Scene 1</text>
+            <circle cx="960" cy="515" r="10" fill="var(--dgm-bg-figure)" stroke="var(--dgm-accent)" stroke-width="1.5"/>
+            <text x="960" y="519" text-anchor="middle" class="dgm-step dgm-step-accent">3</text>
+
+          </svg>
+        </div>
+      </figure>
+
+      <div class="scene-notes">
+        <p class="scene-note"><strong>Path A is bounded.</strong>
+          A Session can not "leak" forever - the idle timer is unconditional.
+          A tab opened, claimed, and abandoned costs the dev server ~one
+          Session worth of memory for at most 4 hours.</p>
+        <p class="scene-note"><strong>Path B is graceful.</strong>
+          The SDK on
+          <code>TesseronError(ResumeFailed)</code> clears the stored creds and
+          retries with <code>tesseron/hello</code>. The user just sees a new
+          claim code, exactly as on a brand-new tab. No error UI required.</p>
+        <p class="scene-note"><strong>Constant-time compare.</strong>
+          Token validation uses <code>constantTimeEqual</code> on equal-length
+          strings, so a brute-force attacker can not learn the right prefix
+          from timing the rejection.</p>
+      </div>
+    </section>
+
+
+    <!-- ---------------------------------------------------------------------
+         Bottom: three summary cards. What changed, what to do, where to read.
+         --------------------------------------------------------------------- -->
+
+    <section class="cards">
+      <article class="card">
+        <div class="card-header"><span class="card-dot accent"></span><h3>What changed in v2.9.0</h3></div>
+        <ul>
+          <li>Vite plugin owns a <code>Session</code> by <code>sessionId</code>; browser WS is just an attachment.</li>
+          <li>Refresh detaches and reattaches; bridge to the gateway stays open across both.</li>
+          <li>Idle TTL <code>sessionIdleTtlMs</code> bounds the hold time. Default 4h.</li>
+          <li>Gateway-mint path also bumped: <code>resumeTtlMs</code> 90s -&gt; 4h.</li>
+          <li>Web SDK auto-persists in <code>localStorage</code> by default.</li>
+          <li>React, Vue, Svelte hooks default <code>resume: true</code>.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <div class="card-header"><span class="card-dot neutral"></span><h3>What you need to do</h3></div>
+        <ul>
+          <li>Bump <code>@tesseron/*</code> to <code>2.9.0</code> in lockstep.</li>
+          <li>Reinstall + rebuild. No code changes required.</li>
+          <li>Opt out per-app with <code>{ resume: false }</code> for incognito-style flows.</li>
+          <li>Tune the dev TTL with <code>tesseron({ sessionIdleTtlMs: ... })</code>.</li>
+          <li>Verify: claim, refresh, observe same session + rotated token + no new claim code.</li>
+        </ul>
+      </article>
+
+      <article class="card danger">
+        <div class="card-header"><span class="card-dot danger"></span><h3>When resume does NOT happen</h3></div>
+        <ul>
+          <li>Tab idle for more than <code>sessionIdleTtlMs</code> (4h default).</li>
+          <li>Dev server (Vite) restarted - Session memory is gone.</li>
+          <li>Gateway / Claude Code restarted.</li>
+          <li><code>localStorage</code> was cleared (incognito, dev tools, another tab).</li>
+          <li>App caller passed <code>resume: false</code> explicitly.</li>
+          <li>All of the above fall back to a clean <code>tesseron/hello</code> - same UX as first connect.</li>
+        </ul>
+      </article>
+    </section>
+
+    <footer class="footer">
+      tesseron-diagram | session-resume-flow v1.0 | accompanies the v2.9.0 release
+    </footer>
+
+  </div>
+</body>
+</html>
