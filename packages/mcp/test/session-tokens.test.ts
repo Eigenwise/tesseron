@@ -77,10 +77,11 @@ describe('generateClaimCode', () => {
       seen.add(generateClaimCode());
     }
     // The 31^6 ≈ 887M space makes collisions in 1000 draws cosmically
-    // unlikely (birthday paradox: 50% at ~37000). Fewer than 1000 unique
-    // values is a sign the CSPRNG path is broken (e.g. fixed seed in a
-    // misconfigured test runner).
-    expect(seen.size).toBe(1000);
+    // unlikely (birthday paradox: 50% at ~37000) — but not impossible
+    // (~0.06% chance of a single collision per run), so asserting an exact
+    // 1000 is a flaky `toBe`. A broken CSPRNG path (fixed seed, lost
+    // entropy) collides hundreds of times and still trips the floor below.
+    expect(seen.size).toBeGreaterThan(995);
   });
 });
 
@@ -113,8 +114,8 @@ describe('generateSessionId / generateInvocationId', () => {
       sessionSeen.add(generateSessionId());
       invocationSeen.add(generateInvocationId());
     }
-    expect(sessionSeen.size).toBe(1000);
-    expect(invocationSeen.size).toBe(1000);
+    expect(sessionSeen.size).toBeGreaterThan(995);
+    expect(invocationSeen.size).toBeGreaterThan(995);
   });
 });
 
@@ -138,7 +139,7 @@ describe('generateResumeToken', () => {
     for (let i = 0; i < 1000; i++) {
       seen.add(generateResumeToken());
     }
-    expect(seen.size).toBe(1000);
+    expect(seen.size).toBeGreaterThan(995);
   });
 
   it('successive calls produce different values', () => {
