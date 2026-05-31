@@ -9,7 +9,10 @@
       "@tesseron/server",
       "@tesseron/react",
       "@tesseron/mcp",
-      "@tesseron/docs-mcp"
+      "@tesseron/docs-mcp",
+      "@tesseron/svelte",
+      "@tesseron/vue",
+      "@tesseron/vite"
     ]
   ],
   "linked": [],
