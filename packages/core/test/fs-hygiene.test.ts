@@ -1,7 +1,7 @@
 /**
  * Coverage for the {@link writePrivateFile} / {@link ensurePrivateDir} helpers
- * the Vite plugin (and its byte-identical siblings in `@tesseron/server` and
- * `@tesseron/mcp`) use for every `~/.tesseron/*` write.
+ * (`@tesseron/core/node`) that `@tesseron/server`, `@tesseron/vite`, and
+ * `@tesseron/mcp` use for every `~/.tesseron/*` write.
  *
  * The mode-bit assertions only run on POSIX. Windows treats POSIX modes as
  * advisory; the parent-dir-as-access-gate model documented in the UDS
@@ -14,7 +14,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ensurePrivateDir, writePrivateFile } from '../src/fs-hygiene.js';
+import { ensurePrivateDir, writePrivateFile } from '../src/node/fs-hygiene.js';
 
 let sandbox: string;
 

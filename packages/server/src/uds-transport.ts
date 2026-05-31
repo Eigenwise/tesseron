@@ -3,18 +3,22 @@ import { chmod, mkdtemp, rm, unlink } from 'node:fs/promises';
 import { type Server, type Socket, createServer } from 'node:net';
 import { homedir, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AgentIdentity, HelloParams, Transport, WelcomeResult } from '@tesseron/core';
-import { PROTOCOL_VERSION, TesseronErrorCode } from '@tesseron/core';
+import type { AgentIdentity, HelloParams, Transport } from '@tesseron/core';
+import { TesseronErrorCode } from '@tesseron/core';
 import { constantTimeEqual } from '@tesseron/core/internal';
-import { mintClaimCode, mintResumeToken, mintSessionId } from './claim-mint.js';
-import { writePrivateFile } from './fs-hygiene.js';
+import {
+  BindRateLimiter,
+  buildSynthesizedWelcomeResponse,
+  isHelloFrame,
+  mintClaimCode,
+  mintResumeToken,
+  mintSessionId,
+  writePrivateFile,
+} from '@tesseron/core/node';
 
 const isWindows = platform() === 'win32';
 const HOST_MINT_TTL_MS = 10 * 60 * 1000;
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
-const BIND_FAILURE_THRESHOLD = 5;
-const BIND_FAILURE_WINDOW_MS = 60_000;
-const BIND_FAILURE_LOCKOUT_MS = 60_000;
 
 function getInstancesDir(): string {
   return join(homedir(), '.tesseron', 'instances');
@@ -84,8 +88,7 @@ export class UnixSocketServerTransport implements Transport {
   private helloAnswered = false;
   private helloReplayId?: string;
   private heartbeatTimer?: ReturnType<typeof setInterval>;
-  private readonly bindFailureTimes: number[] = [];
-  private bindLockoutUntil = 0;
+  private readonly bindLimiter = new BindRateLimiter();
 
   constructor(options: UnixSocketServerTransportOptions = {}) {
     this.options = options;
@@ -274,7 +277,7 @@ export class UnixSocketServerTransport implements Transport {
     params: { code: string };
   }): void {
     const now = Date.now();
-    if (now < this.bindLockoutUntil) {
+    if (this.bindLimiter.isLockedOut(now)) {
       this.respondBindError(req.id, TesseronErrorCode.Unauthorized, 'rate-limit lockout');
       this.socket?.end();
       this.socket?.destroy();
@@ -297,13 +300,13 @@ export class UnixSocketServerTransport implements Transport {
       return;
     }
     if (!constantTimeEqual(req.params.code.toUpperCase(), this.hostMintedClaim.code)) {
-      this.recordBindFailure(now);
+      this.bindLimiter.recordFailure(now, this.instanceId);
       this.respondBindError(req.id, TesseronErrorCode.Unauthorized, 'bind code mismatch');
       this.socket?.end();
       this.socket?.destroy();
       return;
     }
-    this.bindFailureTimes.length = 0;
+    this.bindLimiter.reset();
     this.boundViaHandshake = true;
     // Respond first so the gateway's dial promise resolves before any
     // hello-replay traffic.
@@ -352,41 +355,9 @@ export class UnixSocketServerTransport implements Transport {
     }
   }
 
-  private recordBindFailure(now: number): void {
-    const cutoff = now - BIND_FAILURE_WINDOW_MS;
-    while (this.bindFailureTimes.length > 0 && this.bindFailureTimes[0]! < cutoff) {
-      this.bindFailureTimes.shift();
-    }
-    this.bindFailureTimes.push(now);
-    if (this.bindFailureTimes.length >= BIND_FAILURE_THRESHOLD) {
-      this.bindLockoutUntil = now + BIND_FAILURE_LOCKOUT_MS;
-      this.bindFailureTimes.length = 0;
-      process.stderr.write(
-        `[tesseron] UDS bind rate-limit triggered for instance ${this.instanceId}; locked out for ${BIND_FAILURE_LOCKOUT_MS}ms\n`,
-      );
-    }
-  }
-
   private deliverSynthesizedWelcome(sdkHelloId: unknown, helloParams: HelloParams): void {
-    const synthesized: WelcomeResult = {
-      sessionId: this.hostMintedClaim.sessionId,
-      protocolVersion: PROTOCOL_VERSION,
-      capabilities: {
-        streaming: true,
-        subscriptions: true,
-        sampling: false,
-        elicitation: false,
-      },
-      agent: { id: 'pending', name: 'Awaiting agent' },
-      claimCode: this.hostMintedClaim.code,
-      resumeToken: this.hostMintedClaim.resumeToken,
-    };
-    void helloParams;
-    const response = {
-      jsonrpc: '2.0' as const,
-      id: sdkHelloId as string | number | null,
-      result: synthesized,
-    };
+    void helloParams; // silence unused; reserved for future capability negotiation
+    const response = buildSynthesizedWelcomeResponse(this.hostMintedClaim, sdkHelloId);
     for (const handler of this.messageHandlers) handler(response);
     this.helloAnswered = true;
   }
@@ -498,14 +469,5 @@ export class UnixSocketServerTransport implements Transport {
     if (this.tempDir) {
       rm(this.tempDir, { recursive: true, force: true }).catch(() => {});
     }
-  }
-}
-
-function isHelloFrame(raw: string): boolean {
-  try {
-    const parsed = JSON.parse(raw) as { method?: unknown };
-    return parsed.method === 'tesseron/hello';
-  } catch {
-    return false;
   }
 }

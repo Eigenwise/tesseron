@@ -7,10 +7,15 @@ import { join } from 'node:path';
 import type { AgentIdentity, WelcomeResult } from '@tesseron/core';
 import { PROTOCOL_VERSION, TesseronErrorCode } from '@tesseron/core';
 import { constantTimeEqual, parseBindSubprotocol, validateAppId } from '@tesseron/core/internal';
+import {
+  BindRateLimiter,
+  mintClaimCode,
+  mintResumeToken,
+  mintSessionId,
+  writePrivateFile,
+} from '@tesseron/core/node';
 import type { Plugin, ViteDevServer } from 'vite';
 import { type RawData, type WebSocket, WebSocketServer } from 'ws';
-import { mintClaimCode, mintResumeToken, mintSessionId } from './claim-mint.js';
-import { writePrivateFile } from './fs-hygiene.js';
 
 export interface TesseronViteOptions {
   /** Human-readable app name written to the instance manifest. Defaults to the Vite project directory name. */
@@ -50,12 +55,6 @@ interface HostMintedClaim {
 const HOST_MINT_TTL_MS = 10 * 60 * 1000;
 /** How often the plugin rewrites the manifest with a fresh `mintedAt` / `expiresAt`. */
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
-/** Bind-mismatch failures inside the rolling window before lock-out. */
-const BIND_FAILURE_THRESHOLD = 5;
-/** Rolling window for failure counting (ms). */
-const BIND_FAILURE_WINDOW_MS = 60_000;
-/** Lock-out duration once the threshold is crossed (ms). */
-const BIND_FAILURE_LOCKOUT_MS = 60_000;
 /**
  * Default idle TTL: how long a Session is held without a browser WS attached
  * before the plugin tears it down. Matches `@tesseron/mcp`'s `resumeTtlMs`
@@ -115,12 +114,10 @@ interface Session {
    *  carrying this id is dropped (the SDK already saw the synthesized
    *  welcome). */
   helloReplayId?: string;
-  /** Bind-failure timestamps for the rolling window. Reset on a successful
-   *  bind to avoid coupling a one-time misconfiguration to legitimate retries. */
-  bindFailureTimes: number[];
-  /** Lock-out deadline. Subsequent bind upgrades return HTTP 429 until this
-   *  epoch passes. */
-  bindLockoutUntil: number;
+  /** Rolling-window rate limiter for bind-code mismatches. Reset on a
+   *  successful bind to avoid coupling a one-time misconfiguration to
+   *  legitimate retries; locks out (HTTP 429) once the threshold is crossed. */
+  bindLimiter: BindRateLimiter;
   /** True once a `tesseron-bind.<code>` upgrade has been accepted. Required
    *  before the host accepts a non-bind dial (legacy v1.1 dials are rejected
    *  with HTTP 426). */
@@ -319,8 +316,7 @@ class SessionManager {
       appName: opts.appName,
       hostMintedClaim,
       helloAnswered: false,
-      bindFailureTimes: [],
-      bindLockoutUntil: 0,
+      bindLimiter: new BindRateLimiter(),
       boundViaSubprotocol: false,
       browserWs: opts.browserWs,
       queue: [],
@@ -831,7 +827,7 @@ function handleGatewayUpgrade(
   );
   if (bind.code !== null) {
     const now = Date.now();
-    if (now < session.bindLockoutUntil) {
+    if (session.bindLimiter.isLockedOut(now)) {
       const body =
         'Too many bind failures; this instance is locked out. Reload the tab to mint a fresh session.';
       socket.end(
@@ -840,18 +836,8 @@ function handleGatewayUpgrade(
       return;
     }
     if (!constantTimeEqual(bind.code, session.hostMintedClaim.code)) {
-      const cutoff = now - BIND_FAILURE_WINDOW_MS;
-      while (session.bindFailureTimes.length > 0 && session.bindFailureTimes[0]! < cutoff) {
-        session.bindFailureTimes.shift();
-      }
-      session.bindFailureTimes.push(now);
-      if (session.bindFailureTimes.length >= BIND_FAILURE_THRESHOLD) {
-        session.bindLockoutUntil = now + BIND_FAILURE_LOCKOUT_MS;
-        session.bindFailureTimes = [];
-        process.stderr.write(
-          `[tesseron] bind rate-limit triggered for instance ${session.instanceId}; locked out for ${BIND_FAILURE_LOCKOUT_MS}ms\n`,
-        );
-      } else {
+      const lockedOut = session.bindLimiter.recordFailure(now, session.instanceId);
+      if (!lockedOut) {
         process.stderr.write(
           `[tesseron] rejecting bind subprotocol upgrade for instance ${session.instanceId} (code mismatch)\n`,
         );
@@ -869,7 +855,7 @@ function handleGatewayUpgrade(
       );
       return;
     }
-    session.bindFailureTimes = [];
+    session.bindLimiter.reset();
     session.boundViaSubprotocol = true;
   } else if (bind.reason !== undefined) {
     process.stderr.write(`[tesseron] rejecting bind upgrade: ${bind.reason}\n`);

@@ -17,13 +17,13 @@
  *     temp lives in the same directory as the target, the rename is
  *     guaranteed same-filesystem and is atomic on POSIX and on Windows ≥ 10.
  *
- * Byte-identical copies of this file ship in `@tesseron/vite`,
- * `@tesseron/server`, and `@tesseron/mcp`. Three copies is cheaper than
- * wiring a new shared package or making `@tesseron/vite` depend on
- * `@tesseron/server` just for ~100 lines of disk plumbing. A drift-detection
- * test in `@tesseron/mcp` (which transitively owns the other two) hashes
- * all three at test time and fails if they diverge — see
- * `packages/mcp/test/fs-hygiene-parity.test.ts`.
+ * Single source of truth shared by `@tesseron/server`, `@tesseron/vite`, and
+ * `@tesseron/mcp` via the `@tesseron/core/node` subpath. (Previously shipped as
+ * three byte-identical copies guarded by a drift-detection test; now there is
+ * one copy and nothing to drift.)
+ *
+ * Node-only — imports `node:fs`. Never import from the browser-safe main
+ * `@tesseron/core` entry; this lives behind the explicit `/node` subpath.
  */
 
 import { constants as fsConstants } from 'node:fs';

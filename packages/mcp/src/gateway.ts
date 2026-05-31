@@ -24,8 +24,8 @@ import {
   type WelcomeResult,
 } from '@tesseron/core';
 import { JsonRpcDispatcher, constantTimeEqual } from '@tesseron/core/internal';
+import { writePrivateFile } from '@tesseron/core/node';
 import { type DialedTransport, type GatewayDialer, UdsDialer, WsDialer } from './dialer.js';
-import { writePrivateFile } from './fs-hygiene.js';
 import {
   type Session,
   generateClaimCode,
