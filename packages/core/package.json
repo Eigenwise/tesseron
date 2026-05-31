@@ -51,6 +51,11 @@
       "types": "./src/internal.ts",
       "import": "./dist/internal.js",
       "require": "./dist/internal.cjs"
+    },
+    "./node": {
+      "types": "./src/node.ts",
+      "import": "./dist/node.js",
+      "require": "./dist/node.cjs"
     }
   },
   "files": ["dist", "README.md", "LICENSE"],
@@ -65,6 +70,7 @@
     "@standard-schema/spec": "^1.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "vitest": "^2.1.0"
   },
   "publishConfig": {
@@ -92,6 +98,11 @@
         "types": "./dist/internal.d.ts",
         "import": "./dist/internal.js",
         "require": "./dist/internal.cjs"
+      },
+      "./node": {
+        "types": "./dist/node.d.ts",
+        "import": "./dist/node.js",
+        "require": "./dist/node.cjs"
       }
     }
   }

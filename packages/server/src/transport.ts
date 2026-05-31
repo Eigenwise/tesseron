@@ -4,12 +4,18 @@ import { unlink } from 'node:fs/promises';
 import { type Server, createServer } from 'node:http';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { AgentIdentity, HelloParams, Transport, WelcomeResult } from '@tesseron/core';
-import { PROTOCOL_VERSION } from '@tesseron/core';
+import type { AgentIdentity, HelloParams, Transport } from '@tesseron/core';
 import { constantTimeEqual, parseBindSubprotocol, validateAppId } from '@tesseron/core/internal';
+import {
+  BindRateLimiter,
+  buildSynthesizedWelcomeResponse,
+  isHelloFrame,
+  mintClaimCode,
+  mintResumeToken,
+  mintSessionId,
+  writePrivateFile,
+} from '@tesseron/core/node';
 import { type RawData, type WebSocket, WebSocketServer } from 'ws';
-import { mintClaimCode, mintResumeToken, mintSessionId } from './claim-mint.js';
-import { writePrivateFile } from './fs-hygiene.js';
 
 const GATEWAY_SUBPROTOCOL = 'tesseron-gateway';
 /**
@@ -26,17 +32,6 @@ const HOST_MINT_TTL_MS = 10 * 60 * 1000;
  * live session.
  */
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
-/**
- * Max bind-mismatch failures inside the rolling window before the host
- * locks the entry. Five wrong bind attempts is plenty of headroom for a
- * legitimate retry loop while shutting down a sustained brute-force
- * cleanly.
- */
-const BIND_FAILURE_THRESHOLD = 5;
-/** Rolling window for {@link BIND_FAILURE_THRESHOLD} (ms). */
-const BIND_FAILURE_WINDOW_MS = 60_000;
-/** Lock-out duration once the threshold is crossed (ms). */
-const BIND_FAILURE_LOCKOUT_MS = 60_000;
 
 /**
  * Resolves the instance-discovery directory on every call rather than at
@@ -123,10 +118,8 @@ export class NodeWebSocketServerTransport implements Transport {
   private helloReplayId?: string;
   /** Heartbeat timer rewriting the manifest every {@link HEARTBEAT_INTERVAL_MS}. Cleared on `close`. */
   private heartbeatTimer?: ReturnType<typeof setInterval>;
-  /** Bind-failure timestamps for the rate limit's rolling window. */
-  private readonly bindFailureTimes: number[] = [];
-  /** Lock-out deadline (ms epoch) when set; until then every bind upgrade gets 429. */
-  private bindLockoutUntil = 0;
+  /** Rolling-window rate limiter for bind-code mismatches. */
+  private readonly bindLimiter = new BindRateLimiter();
 
   constructor(options: NodeWebSocketServerTransportOptions = {}) {
     this.options = options;
@@ -164,7 +157,7 @@ export class NodeWebSocketServerTransport implements Transport {
       // window after a sustained mismatch burst. 429 makes the failure
       // distinguishable from a code-mismatch 403.
       const now = Date.now();
-      if (now < this.bindLockoutUntil) {
+      if (this.bindLimiter.isLockedOut(now)) {
         const body =
           'Too many bind failures; this host is locked out. Mint a fresh session by reloading.';
         socket.end(
@@ -179,7 +172,7 @@ export class NodeWebSocketServerTransport implements Transport {
       const bind = parseBindSubprotocol(protoStr);
       if (bind.code !== null) {
         if (!constantTimeEqual(bind.code, this.hostMintedClaim.code)) {
-          this.recordBindFailure(now);
+          this.bindLimiter.recordFailure(now, this.instanceId);
           const body = 'Bind code does not match the host-minted claim.';
           socket.end(
             `HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: ${Buffer.byteLength(body)}\r\nConnection: close\r\n\r\n${body}`,
@@ -210,7 +203,7 @@ export class NodeWebSocketServerTransport implements Transport {
         }
         // Reset the failure window on a successful bind so a slow brute-
         // force can't accumulate a lock-out across an eventual hit.
-        this.bindFailureTimes.length = 0;
+        this.bindLimiter.reset();
         this.boundViaSubprotocol = true;
       } else if (bind.reason !== undefined) {
         const body = `Malformed bind subprotocol: ${bind.reason}`;
@@ -337,51 +330,9 @@ export class NodeWebSocketServerTransport implements Transport {
     });
   }
 
-  /**
-   * Track a bind-mismatch failure for the rate limit. Once the rolling
-   * window exceeds {@link BIND_FAILURE_THRESHOLD} mismatches the entry
-   * locks out for {@link BIND_FAILURE_LOCKOUT_MS}; subsequent upgrades
-   * get HTTP 429 until the cool-down elapses.
-   */
-  private recordBindFailure(now: number): void {
-    const cutoff = now - BIND_FAILURE_WINDOW_MS;
-    while (this.bindFailureTimes.length > 0 && this.bindFailureTimes[0]! < cutoff) {
-      this.bindFailureTimes.shift();
-    }
-    this.bindFailureTimes.push(now);
-    if (this.bindFailureTimes.length >= BIND_FAILURE_THRESHOLD) {
-      this.bindLockoutUntil = now + BIND_FAILURE_LOCKOUT_MS;
-      this.bindFailureTimes.length = 0;
-      process.stderr.write(
-        `[tesseron] bind rate-limit triggered for instance ${this.instanceId}; locked out for ${BIND_FAILURE_LOCKOUT_MS}ms\n`,
-      );
-    }
-  }
-
   private deliverSynthesizedWelcome(sdkHelloId: unknown, helloParams: HelloParams): void {
-    const synthesized: WelcomeResult = {
-      sessionId: this.hostMintedClaim.sessionId,
-      protocolVersion: PROTOCOL_VERSION,
-      // Conservative pre-claim defaults: the host has no visibility
-      // into the gateway's MCP-client capabilities at this point. The
-      // gateway's real values arrive via `tesseron/claimed.agentCapabilities`
-      // and the SDK overwrites these defaults in its claimed handler.
-      capabilities: {
-        streaming: true,
-        subscriptions: true,
-        sampling: false,
-        elicitation: false,
-      },
-      agent: { id: 'pending', name: 'Awaiting agent' },
-      claimCode: this.hostMintedClaim.code,
-      resumeToken: this.hostMintedClaim.resumeToken,
-    };
     void helloParams; // silence unused; reserved for future capability negotiation
-    const response = {
-      jsonrpc: '2.0' as const,
-      id: sdkHelloId as string | number | null,
-      result: synthesized,
-    };
+    const response = buildSynthesizedWelcomeResponse(this.hostMintedClaim, sdkHelloId);
     for (const handler of this.messageHandlers) handler(response);
     this.helloAnswered = true;
   }
@@ -525,14 +476,5 @@ export class NodeWebSocketServerTransport implements Transport {
     this.ws?.close(1000, reason);
     this.wss?.close();
     this.server?.close();
-  }
-}
-
-function isHelloFrame(raw: string): boolean {
-  try {
-    const parsed = JSON.parse(raw) as { method?: unknown };
-    return parsed.method === 'tesseron/hello';
-  } catch {
-    return false;
   }
 }

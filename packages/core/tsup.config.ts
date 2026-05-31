@@ -6,6 +6,7 @@ export default defineConfig({
     protocol: 'src/protocol.ts',
     errors: 'src/errors.ts',
     internal: 'src/internal.ts',
+    node: 'src/node.ts',
   },
   outDir: 'dist',
   format: ['esm', 'cjs'],
