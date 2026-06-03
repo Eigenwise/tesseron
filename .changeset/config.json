@@ -20,8 +20,6 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
-    "@tesseron/devtools",
-    "create-tesseron",
     "@tesseron/docs",
     "vanilla-todo",
     "react-todo",

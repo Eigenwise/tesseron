@@ -162,8 +162,6 @@ See [`examples/`](./examples) for working apps in vanilla TS, React, Svelte, Vue
 | [`@tesseron/vite`](./packages/vite) | Vite plugin: dev-server bridge for browser tabs to dial the gateway over the same origin as your app. |
 | [`@tesseron/mcp`](./packages/mcp) | MCP gateway server (`tesseron-mcp` CLI; launched by each client's install path via `npx`). |
 | [`@tesseron/docs-mcp`](./packages/docs-mcp) | MCP server that serves the Tesseron docs (`search_docs`, `read_doc`, `list_docs`) for chapter-and-verse spec lookups inside agent sessions. |
-| [`@tesseron/devtools`](./packages/devtools) | In-browser debug UI served by the MCP gateway *(private stub, not yet published)*. |
-| [`create-tesseron`](./packages/create-tesseron) | `npm create tesseron@latest` scaffolder *(private stub, not yet published)*. |
 
 The Claude Code / Codex plugin lives at [`plugin/`](./plugin), exposed via the marketplace manifests at [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) (Claude) and [`.agents/plugins/marketplace.json`](./.agents/plugins/marketplace.json) (Codex).
 
@@ -192,7 +190,7 @@ For the authoritative, continuously-updated list of which client supports which 
 
 Published to npm: `@tesseron/{core,web,server,react,mcp,docs-mcp}` ship in lockstep at the same version (currently **2.7.0**). `@tesseron/{svelte,vue,vite}` version independently. The JS/TS SDKs are the reference implementation; the protocol spec is [CC BY 4.0](./docs/src/content/docs/protocol/LICENSE) so anyone can write a compatible client or server in any language.
 
-On the roadmap: the devtools UI, a Streamable HTTP transport, a Python SDK, and bindings for desktop-native runtimes (Rust for Tauri, etc.).
+On the roadmap: a Streamable HTTP transport, a Python SDK, and bindings for desktop-native runtimes (Rust for Tauri, etc.).
 
 ## Development
 
