@@ -186,9 +186,9 @@ For the authoritative, continuously-updated list of which client supports which 
 
 ## Status
 
-**v1.0** shipped April 2026; the SDK is at **v2.6** as of writing. The protocol is stable at [**1.0.0**](./docs/src/content/docs/protocol) and intentionally kept small: bidirectional JSON-RPC 2.0 over WebSocket, dynamic MCP tool registration, click-to-connect handshake, streaming progress, cancellation, sampling, confirmation, schema-validated elicitation, subscribable resources, session resume.
+**v1.0** shipped April 2026; the SDK is at **v2.10** as of writing. The protocol is stable at [**1.0.0**](./docs/src/content/docs/protocol) and intentionally kept small: bidirectional JSON-RPC 2.0 over WebSocket, dynamic MCP tool registration, click-to-connect handshake, streaming progress, cancellation, sampling, confirmation, schema-validated elicitation, subscribable resources, session resume.
 
-Published to npm: `@tesseron/{core,web,server,react,mcp,docs-mcp}` ship in lockstep at the same version (currently **2.7.0**). `@tesseron/{svelte,vue,vite}` version independently. The JS/TS SDKs are the reference implementation; the protocol spec is [CC BY 4.0](./docs/src/content/docs/protocol/LICENSE) so anyone can write a compatible client or server in any language.
+Published to npm: all nine packages — `@tesseron/{core,web,server,react,svelte,vue,vite,mcp,docs-mcp}` — ship in lockstep at the same version (currently **2.10.0**). The JS/TS SDKs are the reference implementation; the protocol spec is [CC BY 4.0](./docs/src/content/docs/protocol/LICENSE) so anyone can write a compatible client or server in any language.
 
 On the roadmap: a Streamable HTTP transport, a Python SDK, and bindings for desktop-native runtimes (Rust for Tauri, etc.).
 
