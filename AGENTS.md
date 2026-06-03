@@ -28,7 +28,6 @@ repo; do not introduce one.
 - `packages/mcp` — the gateway binary published as `@tesseron/mcp` (`bin: tesseron-mcp`).
 - `packages/docs-mcp` — the docs MCP server published as `@tesseron/docs-mcp`.
 - `packages/{web,server,react,svelte,vue,vite}` — consumer SDKs.
-- `packages/devtools`, `packages/create-tesseron` — auxiliary tooling.
 - `plugin/` — the Claude Code plugin (also accepted by Codex). Skills live in
   `plugin/skills/`, the MCP wiring in `plugin/.mcp.json`, the manifest in
   `plugin/.claude-plugin/plugin.json`.

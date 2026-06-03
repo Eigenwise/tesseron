@@ -22,6 +22,6 @@ permits.
 
 Full license text: https://creativecommons.org/licenses/by/4.0/legalcode
 
-The reference implementation (SDKs, gateway, plugin, devtools, scaffolder,
-docs/examples) remains under the Business Source License 1.1 — see the
+The reference implementation (SDKs, gateway, plugin, docs/examples) remains
+under the Business Source License 1.1 — see the
 top-level LICENSE file.

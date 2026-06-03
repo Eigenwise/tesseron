@@ -46,7 +46,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm -r --filter "@tesseron/*" --filter "!@tesseron/devtools" --filter "!@tesseron/docs" build
+        run: pnpm -r --filter "@tesseron/*" --filter "!@tesseron/docs" build
 
       - name: Typecheck
         run: pnpm typecheck
