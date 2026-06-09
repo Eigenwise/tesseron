@@ -53,7 +53,7 @@ Decorator-flavoured where it fits the ecosystem better than the fluent builder. 
 
 ## Roadmap
 
-- Early spike: TBD, tracked in the [Tesseron repo](https://github.com/BrainBlend-AI/tesseron).
+- Early spike: TBD, tracked in the [Tesseron repo](https://github.com/eigenwise/tesseron).
 - 1.0 target: feature-parity with `@tesseron/core` + `@tesseron/server`.
 
 If you want to contribute or help shape the API, open a discussion on GitHub.

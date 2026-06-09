@@ -8,7 +8,7 @@
 ### Typed live-app actions for MCP-compatible AI agents, over WebSocket.
 
 <p>
-  <a href="https://github.com/BrainBlend-AI/tesseron/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/BrainBlend-AI/tesseron?style=flat-square&color=f59e0b&logo=github&labelColor=0b1220"></a>
+  <a href="https://github.com/eigenwise/tesseron/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/eigenwise/tesseron?style=flat-square&color=f59e0b&logo=github&labelColor=0b1220"></a>
   <a href="./LICENSE"><img alt="License: BUSL-1.1" src="https://img.shields.io/badge/License-BUSL--1.1-f59e0b?style=flat-square&labelColor=0b1220"></a>
   <a href="https://discord.gg/J3W9b5AZJR"><img alt="Discord" src="https://img.shields.io/badge/chat-on%20discord-7289DA?logo=discord&style=flat-square&labelColor=0b1220"></a>
   <img alt="Protocol 1.0.0" src="https://img.shields.io/badge/Protocol-1.0.0-f59e0b?style=flat-square&labelColor=0b1220">
@@ -18,15 +18,15 @@
 </p>
 
 <p>
-  <a href="https://brainblend-ai.github.io/tesseron/"><b>Docs</b></a> &nbsp;·&nbsp;
+  <a href="https://eigenwise.github.io/tesseron/"><b>Docs</b></a> &nbsp;·&nbsp;
   <a href="./examples"><b>Examples</b></a> &nbsp;·&nbsp;
   <a href="#install"><b>Install</b></a> &nbsp;·&nbsp;
   <a href="#packages"><b>Packages</b></a> &nbsp;·&nbsp;
   <a href="https://discord.gg/J3W9b5AZJR"><b>Discord</b></a> &nbsp;·&nbsp;
-  <a href="https://github.com/BrainBlend-AI/tesseron/discussions"><b>Discussions</b></a>
+  <a href="https://github.com/eigenwise/tesseron/discussions"><b>Discussions</b></a>
 </p>
 
-<a href="https://brainblendai.com/"><img src="./assets/brainblend-ai/logo.svg" width="22" height="18" align="center" alt="BrainBlend AI"></a> <sub>Built by <a href="https://brainblendai.com/"><b>BrainBlend AI</b></a></sub>
+<sub>Built by <a href="https://eigenwise.io"><b>Eigenwise</b></a></sub>
 
 </div>
 
@@ -68,7 +68,7 @@ Tesseron has first-class install paths for four agent clients. Pick the one you 
 ### Claude Code
 
 ```text
-/plugin marketplace add BrainBlend-AI/tesseron
+/plugin marketplace add eigenwise/tesseron
 /plugin install tesseron@tesseron
 ```
 
@@ -77,7 +77,7 @@ Installs the [`tesseron`](./plugin) Claude Code plugin. The MCP gateway and docs
 ### Codex CLI
 
 ```bash
-codex plugin marketplace add BrainBlend-AI/tesseron
+codex plugin marketplace add eigenwise/tesseron
 ```
 
 Codex consumes the same plugin manifest as Claude Code, so the gateway, docs server, and skills come along automatically.
@@ -212,10 +212,10 @@ Bug reports, protocol refinements, new framework adapters, and improvements to t
 
 ## Star history
 
-<a href="https://star-history.com/#BrainBlend-AI/tesseron&Date">
+<a href="https://star-history.com/#eigenwise/tesseron&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=BrainBlend-AI/tesseron&type=Date&theme=dark">
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=BrainBlend-AI/tesseron&type=Date" width="720">
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=eigenwise/tesseron&type=Date&theme=dark">
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=eigenwise/tesseron&type=Date" width="720">
   </picture>
 </a>
 
@@ -230,9 +230,6 @@ Contributions are welcome under the [Developer Certificate of Origin](./CONTRIBU
 ---
 
 <p align="center">
-  <a href="https://brainblendai.com/"><img src="./assets/brainblend-ai/logo.svg" width="32" height="27" alt="BrainBlend AI"></a>
-</p>
-<p align="center">
-  Built and maintained by <a href="https://brainblendai.com/"><b>BrainBlend AI</b></a>.<br>
+  Built and maintained by <a href="https://eigenwise.io"><b>Eigenwise</b></a>.<br>
   © 2026 Kenny Vaneetvelde.
 </p>

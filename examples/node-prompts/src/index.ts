@@ -32,7 +32,7 @@ async function main(): Promise<void> {
       `[node-prompts] failed to connect to gateway: ${(error as Error).message}\n`,
     );
     process.stderr.write(
-      '[node-prompts] is the tesseron MCP plugin running? see https://brainblend-ai.github.io/tesseron/overview/quickstart/\n',
+      '[node-prompts] is the tesseron MCP plugin running? see https://eigenwise.github.io/tesseron/overview/quickstart/\n',
     );
     process.exit(1);
   }

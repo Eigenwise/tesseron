@@ -462,7 +462,7 @@ const httpServer = app.listen(HTTP_PORT, async () => {
       `[prompts] failed to connect to gateway: ${(error as Error).message}\n`,
     );
     process.stderr.write(
-      '[prompts] is the tesseron MCP plugin running? see https://brainblend-ai.github.io/tesseron/overview/quickstart/\n',
+      '[prompts] is the tesseron MCP plugin running? see https://eigenwise.github.io/tesseron/overview/quickstart/\n',
     );
   }
 });

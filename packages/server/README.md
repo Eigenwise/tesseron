@@ -1,15 +1,15 @@
 <div align="center">
-  <a href="https://github.com/BrainBlend-AI/tesseron">
+  <a href="https://github.com/eigenwise/tesseron">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/BrainBlend-AI/tesseron/raw/main/assets/logo/tesseron-smallcaps-dark.png">
-      <img src="https://github.com/BrainBlend-AI/tesseron/raw/main/assets/logo/tesseron-smallcaps-light.png" alt="Tesseron" width="380">
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/eigenwise/tesseron/raw/main/assets/logo/tesseron-smallcaps-dark.png">
+      <img src="https://github.com/eigenwise/tesseron/raw/main/assets/logo/tesseron-smallcaps-light.png" alt="Tesseron" width="380">
     </picture>
   </a>
 </div>
 
 # @tesseron/server
 
-Node SDK for [Tesseron](https://github.com/BrainBlend-AI/tesseron). Same Zod-style action builder as [`@tesseron/web`](https://www.npmjs.com/package/@tesseron/web), but for any Node process — a CLI, daemon, worker, Express or Fastify service. Expose typed actions to MCP-compatible AI agents without opening a browser tab.
+Node SDK for [Tesseron](https://github.com/eigenwise/tesseron). Same Zod-style action builder as [`@tesseron/web`](https://www.npmjs.com/package/@tesseron/web), but for any Node process — a CLI, daemon, worker, Express or Fastify service. Expose typed actions to MCP-compatible AI agents without opening a browser tab.
 
 ## Install
 
@@ -17,7 +17,7 @@ Node SDK for [Tesseron](https://github.com/BrainBlend-AI/tesseron). Same Zod-sty
 npm install @tesseron/server
 ```
 
-You also need the [`@tesseron/mcp`](https://www.npmjs.com/package/@tesseron/mcp) gateway running locally — it's bundled inside the [Claude Code plugin](https://github.com/BrainBlend-AI/tesseron/tree/main/plugin).
+You also need the [`@tesseron/mcp`](https://www.npmjs.com/package/@tesseron/mcp) gateway running locally — it's bundled inside the [Claude Code plugin](https://github.com/eigenwise/tesseron/tree/main/plugin).
 
 ## Quick start
 
@@ -77,24 +77,19 @@ app.listen(3000);
 await tesseron.connect();
 ```
 
-Both channels mutate the same state. See [`examples/express-prompts`](https://github.com/BrainBlend-AI/tesseron/tree/main/examples/express-prompts) for a working version (prompt library with sampling and elicitation).
+Both channels mutate the same state. See [`examples/express-prompts`](https://github.com/eigenwise/tesseron/tree/main/examples/express-prompts) for a working version (prompt library with sampling and elicitation).
 
 ## Docs
 
 | | |
 |---|---|
-| Main repo | <https://github.com/BrainBlend-AI/tesseron> |
-| SDK reference | <https://brainblend-ai.github.io/tesseron/sdk/typescript/server/> |
-| Protocol spec | <https://brainblend-ai.github.io/tesseron/protocol/> |
-| Examples | <https://github.com/BrainBlend-AI/tesseron/tree/main/examples> |
+| Main repo | <https://github.com/eigenwise/tesseron> |
+| SDK reference | <https://eigenwise.github.io/tesseron/sdk/typescript/server/> |
+| Protocol spec | <https://eigenwise.github.io/tesseron/protocol/> |
+| Examples | <https://github.com/eigenwise/tesseron/tree/main/examples> |
 
 ## License
 
-Reference implementation — [Business Source License 1.1](https://github.com/BrainBlend-AI/tesseron/blob/main/LICENSE) (source-available). Each release auto-converts to Apache-2.0 four years after publication.
+Reference implementation — [Business Source License 1.1](https://github.com/eigenwise/tesseron/blob/main/LICENSE) (source-available). Each release auto-converts to Apache-2.0 four years after publication.
 
-<p align="center">
-  <a href="https://brainblendai.com/">
-    <img src="https://github.com/BrainBlend-AI/tesseron/raw/main/assets/brainblend-ai/logo.png" width="32" alt="BrainBlend AI">
-  </a>
-</p>
-<p align="center">Built and maintained by <a href="https://brainblendai.com/"><b>BrainBlend AI</b></a>.</p>
+<p align="center">Built and maintained by <a href="https://eigenwise.io/"><b>Eigenwise</b></a>.</p>

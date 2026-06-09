@@ -4,7 +4,7 @@
   "owner": {
     "name": "Kenny Vaneetvelde",
     "email": "kenny.vaneetvelde@gmail.com",
-    "url": "https://github.com/BrainBlend-AI"
+    "url": "https://github.com/eigenwise"
   },
   "metadata": {
     "description": "Tesseron marketplace — ships the Tesseron Claude Code plugin: MCP gateway (reverse-connection architecture, no fixed ports) plus the `framework` mental-model skill, the `tesseron-docs` authoritative-lookup skill (backed by the published `@tesseron/docs-mcp` server), the `tesseron-dev` wiring skill, and `tesseron-explorer` / `tesseron-reviewer` skills for building and auditing web apps that speak the Tesseron protocol.",
@@ -30,7 +30,7 @@
         "skill",
         "documentation"
       ],
-      "homepage": "https://github.com/BrainBlend-AI/tesseron"
+      "homepage": "https://github.com/eigenwise/tesseron"
     }
   ]
 }

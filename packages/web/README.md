@@ -1,15 +1,15 @@
 <div align="center">
-  <a href="https://github.com/BrainBlend-AI/tesseron">
+  <a href="https://github.com/eigenwise/tesseron">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/BrainBlend-AI/tesseron/raw/main/assets/logo/tesseron-smallcaps-dark.png">
-      <img src="https://github.com/BrainBlend-AI/tesseron/raw/main/assets/logo/tesseron-smallcaps-light.png" alt="Tesseron" width="380">
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/eigenwise/tesseron/raw/main/assets/logo/tesseron-smallcaps-dark.png">
+      <img src="https://github.com/eigenwise/tesseron/raw/main/assets/logo/tesseron-smallcaps-light.png" alt="Tesseron" width="380">
     </picture>
   </a>
 </div>
 
 # @tesseron/web
 
-Browser SDK for [Tesseron](https://github.com/BrainBlend-AI/tesseron). Expose typed web-app actions to MCP-compatible AI agents (Claude Code, Claude Desktop, Cursor, Copilot, Codex, ...) over a local WebSocket — your real handlers run against your real state, **no browser automation, no scraping, no Playwright**.
+Browser SDK for [Tesseron](https://github.com/eigenwise/tesseron). Expose typed web-app actions to MCP-compatible AI agents (Claude Code, Claude Desktop, Cursor, Copilot, Codex, ...) over a local WebSocket — your real handlers run against your real state, **no browser automation, no scraping, no Playwright**.
 
 ## Install
 
@@ -17,7 +17,7 @@ Browser SDK for [Tesseron](https://github.com/BrainBlend-AI/tesseron). Expose ty
 npm install @tesseron/web
 ```
 
-You also need the [`@tesseron/mcp`](https://www.npmjs.com/package/@tesseron/mcp) gateway running locally — it's bundled inside the [Claude Code plugin](https://github.com/BrainBlend-AI/tesseron/tree/main/plugin), so `/plugin install tesseron@tesseron` is a one-command setup. For other MCP clients see the [setup guide](https://github.com/BrainBlend-AI/tesseron/blob/main/examples/README.md#2-wire-the-mcp-gateway-into-your-mcp-client).
+You also need the [`@tesseron/mcp`](https://www.npmjs.com/package/@tesseron/mcp) gateway running locally — it's bundled inside the [Claude Code plugin](https://github.com/eigenwise/tesseron/tree/main/plugin), so `/plugin install tesseron@tesseron` is a one-command setup. For other MCP clients see the [setup guide](https://github.com/eigenwise/tesseron/blob/main/examples/README.md#2-wire-the-mcp-gateway-into-your-mcp-client).
 
 ## Quick start
 
@@ -54,7 +54,7 @@ Your page now shows a six-character claim code. When the user types `claim sessi
 
 - **React** — use [`@tesseron/react`](https://www.npmjs.com/package/@tesseron/react) for `useTesseronAction` / `useTesseronResource` / `useTesseronConnection` hooks. They wrap `@tesseron/web` and manage registration lifecycle per component.
 - **Svelte, Vue, vanilla TS** — use `@tesseron/web` directly. Handlers mutate your reactive state (`$state`, `ref`, plain object + `render()`) and the user sees the change live.
-- **Any framework** — the same Zod-style builder works everywhere. See the [examples directory](https://github.com/BrainBlend-AI/tesseron/tree/main/examples) for full apps in vanilla TS, React, Svelte, Vue, and more.
+- **Any framework** — the same Zod-style builder works everywhere. See the [examples directory](https://github.com/eigenwise/tesseron/tree/main/examples) for full apps in vanilla TS, React, Svelte, Vue, and more.
 
 ## Client compatibility
 
@@ -64,19 +64,14 @@ Not every MCP client supports every capability. Before calling `ctx.sample` or `
 
 | | |
 |---|---|
-| Main repo | <https://github.com/BrainBlend-AI/tesseron> |
-| SDK reference | <https://brainblend-ai.github.io/tesseron/sdk/typescript/web/> |
-| Protocol spec | <https://brainblend-ai.github.io/tesseron/protocol/> |
-| Examples | <https://github.com/BrainBlend-AI/tesseron/tree/main/examples> |
-| Discussions | <https://github.com/BrainBlend-AI/tesseron/discussions> |
+| Main repo | <https://github.com/eigenwise/tesseron> |
+| SDK reference | <https://eigenwise.github.io/tesseron/sdk/typescript/web/> |
+| Protocol spec | <https://eigenwise.github.io/tesseron/protocol/> |
+| Examples | <https://github.com/eigenwise/tesseron/tree/main/examples> |
+| Discussions | <https://github.com/eigenwise/tesseron/discussions> |
 
 ## License
 
-Reference implementation — [Business Source License 1.1](https://github.com/BrainBlend-AI/tesseron/blob/main/LICENSE) (source-available). Each release auto-converts to Apache-2.0 four years after publication.
+Reference implementation — [Business Source License 1.1](https://github.com/eigenwise/tesseron/blob/main/LICENSE) (source-available). Each release auto-converts to Apache-2.0 four years after publication.
 
-<p align="center">
-  <a href="https://brainblendai.com/">
-    <img src="https://github.com/BrainBlend-AI/tesseron/raw/main/assets/brainblend-ai/logo.png" width="32" alt="BrainBlend AI">
-  </a>
-</p>
-<p align="center">Built and maintained by <a href="https://brainblendai.com/"><b>BrainBlend AI</b></a>.</p>
+<p align="center">Built and maintained by <a href="https://eigenwise.io/"><b>Eigenwise</b></a>.</p>

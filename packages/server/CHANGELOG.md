@@ -4,7 +4,7 @@
 
 ### Minor Changes
 
-- [#95](https://github.com/BrainBlend-AI/tesseron/pull/95) [`119cb2e`](https://github.com/BrainBlend-AI/tesseron/commit/119cb2efd250447553c1986e3c1b2f868c519202) by Kenny - refactor(web, react, svelte, vue, core, server, mcp, vite): single shared implementation behind every SDK — zero duplicated logic across packages
+- [#95](https://github.com/eigenwise/tesseron/pull/95) [`119cb2e`](https://github.com/eigenwise/tesseron/commit/119cb2efd250447553c1986e3c1b2f868c519202) by Kenny - refactor(web, react, svelte, vue, core, server, mcp, vite): single shared implementation behind every SDK — zero duplicated logic across packages
 
   Two families of copy-pasted code are collapsed to one source each. Every
   public API — React hooks, Svelte stores, Vue composables, the gateway, the
@@ -42,21 +42,21 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`119cb2e`](https://github.com/BrainBlend-AI/tesseron/commit/119cb2efd250447553c1986e3c1b2f868c519202)]:
+- Updated dependencies [[`119cb2e`](https://github.com/eigenwise/tesseron/commit/119cb2efd250447553c1986e3c1b2f868c519202)]:
   - @tesseron/core@2.10.0
 
 ## 2.9.1
 
 ### Patch Changes
 
-- Updated dependencies [[`7b9236a`](https://github.com/BrainBlend-AI/tesseron/commit/7b9236a9c4dd2f6a0d493d8b9e96c59a58be96a8)]:
+- Updated dependencies [[`7b9236a`](https://github.com/eigenwise/tesseron/commit/7b9236a9c4dd2f6a0d493d8b9e96c59a58be96a8)]:
   - @tesseron/core@2.9.1
 
 ## 2.9.0
 
 ### Minor Changes
 
-- [`af19ac3`](https://github.com/BrainBlend-AI/tesseron/commit/af19ac3a0013fccbd05d6dec5cc0c0eb6b7e057e) by Kenny - feat(vite, web, react, vue, svelte, mcp): session resume is now the default — no more claim-code dance on refresh
+- [`af19ac3`](https://github.com/eigenwise/tesseron/commit/af19ac3a0013fccbd05d6dec5cc0c0eb6b7e057e) by Kenny - feat(vite, web, react, vue, svelte, mcp): session resume is now the default — no more claim-code dance on refresh
 
   A casual page refresh keeps the same Tesseron session paired with the agent.
   The work coordinates four layers; each is independently correct, and together
@@ -69,7 +69,7 @@
     `sessionIdleTtlMs` option), and a reattaching browser within that window
     cancels it. The gateway-side bridge stays open across detach/reattach so
     the agent never sees a disconnect. The previous "host-mint sessions don't
-    honour resume" rejection ([#68](https://github.com/BrainBlend-AI/tesseron/issues/68)) is replaced by proper resume validation:
+    honour resume" rejection ([#68](https://github.com/eigenwise/tesseron/issues/68)) is replaced by proper resume validation:
     constant-time compare against the stored resume token, rotate on success,
     fall through to `ResumeFailed` on any miss.
   - **@tesseron/mcp** — bumps `DEFAULT_RESUME_TTL_MS` from 90 seconds to
@@ -109,20 +109,20 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`af19ac3`](https://github.com/BrainBlend-AI/tesseron/commit/af19ac3a0013fccbd05d6dec5cc0c0eb6b7e057e)]:
+- Updated dependencies [[`af19ac3`](https://github.com/eigenwise/tesseron/commit/af19ac3a0013fccbd05d6dec5cc0c0eb6b7e057e)]:
   - @tesseron/core@2.9.0
 
 ## 2.8.1
 
 ### Patch Changes
 
-- [#89](https://github.com/BrainBlend-AI/tesseron/pull/89) [`77f8a64`](https://github.com/BrainBlend-AI/tesseron/commit/77f8a641c8fb514baefe7e4b24a605772711a2ae) by Kenny - fix(core, web, react): make `connect()` re-entrant so claimed-session resume survives StrictMode and HMR (closes [#88](https://github.com/BrainBlend-AI/tesseron/issues/88))
+- [#89](https://github.com/eigenwise/tesseron/pull/89) [`77f8a64`](https://github.com/eigenwise/tesseron/commit/77f8a641c8fb514baefe7e4b24a605772711a2ae) by Kenny - fix(core, web, react): make `connect()` re-entrant so claimed-session resume survives StrictMode and HMR (closes [#88](https://github.com/eigenwise/tesseron/issues/88))
 
   Two `connect()` calls used to race on `this.transport`: the second closed the
   first's socket mid-handshake, frames in flight on either socket — including
   the gateway's `tesseron/resume` response — could be lost, and a claimed
   session ended up displaying a fresh claim code instead of resuming. The
-  predecessor fix in [#68](https://github.com/BrainBlend-AI/tesseron/issues/68) papered this over for unclaimed sessions, but
+  predecessor fix in [#68](https://github.com/eigenwise/tesseron/issues/68) papered this over for unclaimed sessions, but
   claimed-session resume across full page reloads (e.g. Vite hot-reloading a
   module-scope side effect) still failed.
 
@@ -149,21 +149,21 @@
   workaround that was needed to mask the race; the SDK manages the
   lifecycle by itself.
 
-- Updated dependencies [[`77f8a64`](https://github.com/BrainBlend-AI/tesseron/commit/77f8a641c8fb514baefe7e4b24a605772711a2ae)]:
+- Updated dependencies [[`77f8a64`](https://github.com/eigenwise/tesseron/commit/77f8a641c8fb514baefe7e4b24a605772711a2ae)]:
   - @tesseron/core@2.8.1
 
 ## 2.8.0
 
 ### Patch Changes
 
-- Updated dependencies [[`bcf950d`](https://github.com/BrainBlend-AI/tesseron/commit/bcf950d5ba9f567a1d7a0b080b094544d30bfd86)]:
+- Updated dependencies [[`bcf950d`](https://github.com/eigenwise/tesseron/commit/bcf950d5ba9f567a1d7a0b080b094544d30bfd86)]:
   - @tesseron/core@2.8.0
 
 ## 2.7.0
 
 ### Minor Changes
 
-- [#82](https://github.com/BrainBlend-AI/tesseron/pull/82) [`cba7894`](https://github.com/BrainBlend-AI/tesseron/commit/cba7894a3a90fb6b2de7f2a1955ca842a514100b) by Kenny - feat: add `@tesseron/pi` Pi coding-agent plugin
+- [#82](https://github.com/eigenwise/tesseron/pull/82) [`cba7894`](https://github.com/eigenwise/tesseron/commit/cba7894a3a90fb6b2de7f2a1955ca842a514100b) by Kenny - feat: add `@tesseron/pi` Pi coding-agent plugin
 
   New workspace package shipping a Pi extension (`@mariozechner/pi-coding-agent`) that exposes the Tesseron MCP gateway and docs server as eight typed Pi tools (`tesseron_claim_session`, `tesseron_list_actions`, `tesseron_list_pending_claims`, `tesseron_invoke_action`, `tesseron_read_resource`, `tesseron_docs_list`, `tesseron_docs_search`, `tesseron_docs_read`) plus the same five-skill bundle the Claude/Codex plugin ships. Install with `pi install -l npm:@tesseron/pi@<v>`.
 
@@ -171,7 +171,7 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`cba7894`](https://github.com/BrainBlend-AI/tesseron/commit/cba7894a3a90fb6b2de7f2a1955ca842a514100b)]:
+- Updated dependencies [[`cba7894`](https://github.com/eigenwise/tesseron/commit/cba7894a3a90fb6b2de7f2a1955ca842a514100b)]:
   - @tesseron/core@2.7.0
 
 ## 2.6.1
@@ -199,7 +199,7 @@
 
 ### Minor Changes
 
-- [#66](https://github.com/BrainBlend-AI/tesseron/pull/66) [`f93b7f6`](https://github.com/BrainBlend-AI/tesseron/commit/f93b7f6a3f607a9d6a36f309b64379ce4fb82d0c) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Complete the tesseron#60 claim-mediated transport binding by extending the host-mint flow to every host shape and tightening the security model:
+- [#66](https://github.com/eigenwise/tesseron/pull/66) [`f93b7f6`](https://github.com/eigenwise/tesseron/commit/f93b7f6a3f607a9d6a36f309b64379ce4fb82d0c) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Complete the tesseron#60 claim-mediated transport binding by extending the host-mint flow to every host shape and tightening the security model:
 
   **`@tesseron/server` host-mint mirror.** `NodeWebSocketServerTransport` and `UnixSocketServerTransport` now mint `claimCode` / `sessionId` / `resumeToken` at construction, write them into the manifest's `hostMintedClaim`, and intercept the SDK's `tesseron/hello` to synthesize the welcome locally so the SDK can show the host-minted code as soon as `connect()` resolves — no waiting for a gateway dial.
 
@@ -223,21 +223,21 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`f93b7f6`](https://github.com/BrainBlend-AI/tesseron/commit/f93b7f6a3f607a9d6a36f309b64379ce4fb82d0c)]:
+- Updated dependencies [[`f93b7f6`](https://github.com/eigenwise/tesseron/commit/f93b7f6a3f607a9d6a36f309b64379ce4fb82d0c)]:
   - @tesseron/core@2.5.0
 
 ## 2.4.0
 
 ### Minor Changes
 
-- [#64](https://github.com/BrainBlend-AI/tesseron/pull/64) [`abe0cac`](https://github.com/BrainBlend-AI/tesseron/commit/abe0cacad930f748d9bd69a0025be38c6d4d852b) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Claim-mediated transport binding (tesseron#60). The MCP gateway no longer races other gateways to dial a freshly-opened browser tab and mint the user-pasteable claim code in whichever it wins. Instead the SDK host (Vite plugin / `@tesseron/server`) mints the code itself and writes it into the instance manifest; the gateway only dials when the user's `tesseron__claim_session(code)` call matches a host-minted manifest, and authenticates the dial via a `tesseron-bind.<code>` WebSocket subprotocol element.
+- [#64](https://github.com/eigenwise/tesseron/pull/64) [`abe0cac`](https://github.com/eigenwise/tesseron/commit/abe0cacad930f748d9bd69a0025be38c6d4d852b) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Claim-mediated transport binding (tesseron#60). The MCP gateway no longer races other gateways to dial a freshly-opened browser tab and mint the user-pasteable claim code in whichever it wins. Instead the SDK host (Vite plugin / `@tesseron/server`) mints the code itself and writes it into the instance manifest; the gateway only dials when the user's `tesseron__claim_session(code)` call matches a host-minted manifest, and authenticates the dial via a `tesseron-bind.<code>` WebSocket subprotocol element.
 
-  **Why.** With one Claude Code session per gateway process, several gateways often watch `~/.tesseron/instances/` simultaneously. The first to dial a new manifest won the bridge, but on multi-session boxes the OS scheduler picked which gateway saw the welcome — and the user-typed code was usable only in that one Claude window. The single-owner-binding fix from [#54](https://github.com/BrainBlend-AI/tesseron/issues/54) made the race deterministic; this PR makes it irrelevant. The user pastes the code into whichever Claude session they're working in; that gateway scans manifests for a match and dials only the right one. No race, no "switch to the Claude that minted this" detour.
+  **Why.** With one Claude Code session per gateway process, several gateways often watch `~/.tesseron/instances/` simultaneously. The first to dial a new manifest won the bridge, but on multi-session boxes the OS scheduler picked which gateway saw the welcome — and the user-typed code was usable only in that one Claude window. The single-owner-binding fix from [#54](https://github.com/eigenwise/tesseron/issues/54) made the race deterministic; this PR makes it irrelevant. The user pastes the code into whichever Claude session they're working in; that gateway scans manifests for a match and dials only the right one. No race, no "switch to the Claude that minted this" detour.
 
   **Wire shape.**
   - `InstanceManifest` (still `version: 2`) gains two optional fields: `helloHandledByHost: true` and `hostMintedClaim: { code, sessionId, mintedAt, boundAgent }`. v1.1 gateways ignore the new fields and still auto-dial — no regression for old gateways paired with new hosts.
   - New WebSocket subprotocol element `tesseron-bind.<code>` carries the host-minted claim code on the gateway's outbound dial, alongside the existing `tesseron-gateway` element. Subprotocol headers don't appear in URL logs, browser history, or crash dumps the way `?claim=CODE` query strings would.
-  - Constant-time compare (PR [#62](https://github.com/BrainBlend-AI/tesseron/issues/62)'s `constantTimeEqual`) gates the bind validation in the host's upgrade handler.
+  - Constant-time compare (PR [#62](https://github.com/eigenwise/tesseron/issues/62)'s `constantTimeEqual`) gates the bind validation in the host's upgrade handler.
   - The gateway's welcome to a v3-mode dial omits `claimCode` — the host's synthesized welcome already showed it; repeating would race the SDK's UI.
 
   **`gateway.claimSession()` is now async.** Returns `Promise<Session | null>` rather than `Session | null`. The legacy `pendingClaims` lookup happens first (synchronous in practice), then the host-minted scan dials and waits for the session to register. The `@tesseron/mcp` bridge is the only public caller; embedders calling the method directly need to add `await`.
@@ -258,14 +258,14 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`abe0cac`](https://github.com/BrainBlend-AI/tesseron/commit/abe0cacad930f748d9bd69a0025be38c6d4d852b)]:
+- Updated dependencies [[`abe0cac`](https://github.com/eigenwise/tesseron/commit/abe0cacad930f748d9bd69a0025be38c6d4d852b)]:
   - @tesseron/core@2.4.0
 
 ## 2.3.1
 
 ### Patch Changes
 
-- [#58](https://github.com/BrainBlend-AI/tesseron/pull/58) [`eff7726`](https://github.com/BrainBlend-AI/tesseron/commit/eff77265fac8cb0877eefe06030f462aa8048568) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Cross-gateway claim-code disambiguation + stale-manifest tombstoning. Two layers, both addressing concerns left open in tesseron#53 after the single-owner binding fix landed in [#54](https://github.com/BrainBlend-AI/tesseron/issues/54):
+- [#58](https://github.com/eigenwise/tesseron/pull/58) [`eff7726`](https://github.com/eigenwise/tesseron/commit/eff77265fac8cb0877eefe06030f462aa8048568) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Cross-gateway claim-code disambiguation + stale-manifest tombstoning. Two layers, both addressing concerns left open in tesseron#53 after the single-owner binding fix landed in [#54](https://github.com/eigenwise/tesseron/issues/54):
 
   **Stale instance manifests are now skipped and tombstoned.** The SDK side (`@tesseron/server`'s WS and UDS transports, `@tesseron/vite`) now stamps `pid: process.pid` on every `~/.tesseron/instances/<id>.json` it writes. The MCP gateway probes `process.kill(pid, 0)` on each manifest before dialing. Manifests whose owning process is gone get unlinked instead of dialed, so a long-running gateway no longer pays a connection-refused round-trip every poll tick for browser tabs whose Vite server died without a clean shutdown. Older SDKs without `pid` are still trusted (no regression for in-flight upgrades). The `InstanceManifest` type in `@tesseron/core` gains an optional `pid?: number` field.
 
@@ -273,7 +273,7 @@
 
   `TesseronGateway` exposes a new `describeForeignClaim(code)` method returning `{ kind: 'foreign' | 'stale' | 'unknown', ... }` for embedders that build their own claim UIs, and a new `isPidAlive(pid)` helper export.
 
-- [#62](https://github.com/BrainBlend-AI/tesseron/pull/62) [`94d50ef`](https://github.com/BrainBlend-AI/tesseron/commit/94d50ef5364ce2a240b5033674d59b0cbe4ca486) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Harden every `~/.tesseron/*` write and switch all token generation to the platform CSPRNG. Foundations for tesseron#60 (claim-mediated transport binding); shipped on its own so the security improvements land without waiting for the larger architectural change.
+- [#62](https://github.com/eigenwise/tesseron/pull/62) [`94d50ef`](https://github.com/eigenwise/tesseron/commit/94d50ef5364ce2a240b5033674d59b0cbe4ca486) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Harden every `~/.tesseron/*` write and switch all token generation to the platform CSPRNG. Foundations for tesseron#60 (claim-mediated transport binding); shipped on its own so the security improvements land without waiting for the larger architectural change.
 
   **Filesystem hygiene.** Instance manifests (`~/.tesseron/instances/<id>.json`) and claim breadcrumbs (`~/.tesseron/claims/<CODE>.json`) are now written via a shared private-file helper that:
   - creates the parent directory with mode `0o700` (and tightens an existing world-readable directory left over from a pre-hardening release);
@@ -288,14 +288,14 @@
 
   No wire-protocol or public-API changes; the new symbols ship under `@tesseron/core/internal` (explicitly not part of the public contract). Existing tests cover unchanged; a new `fs-hygiene.test.ts` exercises mode bits and atomic-write semantics on POSIX, and a new `timing-safe.test.ts` includes a coarse statistical check that catches a regression to a short-circuiting comparison.
 
-- Updated dependencies [[`eff7726`](https://github.com/BrainBlend-AI/tesseron/commit/eff77265fac8cb0877eefe06030f462aa8048568), [`94d50ef`](https://github.com/BrainBlend-AI/tesseron/commit/94d50ef5364ce2a240b5033674d59b0cbe4ca486)]:
+- Updated dependencies [[`eff7726`](https://github.com/eigenwise/tesseron/commit/eff77265fac8cb0877eefe06030f462aa8048568), [`94d50ef`](https://github.com/eigenwise/tesseron/commit/94d50ef5364ce2a240b5033674d59b0cbe4ca486)]:
   - @tesseron/core@2.3.1
 
 ## 2.3.0
 
 ### Patch Changes
 
-- Updated dependencies [[`f0e671f`](https://github.com/BrainBlend-AI/tesseron/commit/f0e671f1c26195cc597ce90cb2ad8f8f59dd7e9f)]:
+- Updated dependencies [[`f0e671f`](https://github.com/eigenwise/tesseron/commit/f0e671f1c26195cc597ce90cb2ad8f8f59dd7e9f)]:
   - @tesseron/core@2.3.0
 
 ## 2.2.2
@@ -309,14 +309,14 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`db6e0c4`](https://github.com/BrainBlend-AI/tesseron/commit/db6e0c4d1a83583c7012634c17d3579bc95060b7)]:
+- Updated dependencies [[`db6e0c4`](https://github.com/eigenwise/tesseron/commit/db6e0c4d1a83583c7012634c17d3579bc95060b7)]:
   - @tesseron/core@2.2.1
 
 ## 2.2.0
 
 ### Patch Changes
 
-- [#44](https://github.com/BrainBlend-AI/tesseron/pull/44) [`cf604d0`](https://github.com/BrainBlend-AI/tesseron/commit/cf604d0222519f9ed44fab373279e85f60c69062) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Auto-derive JSON Schema from Standard Schema validators that ship a converter.
+- [#44](https://github.com/eigenwise/tesseron/pull/44) [`cf604d0`](https://github.com/eigenwise/tesseron/commit/cf604d0222519f9ed44fab373279e85f60c69062) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Auto-derive JSON Schema from Standard Schema validators that ship a converter.
 
   The documented `.input(z.object({...}))` idiom previously shipped every action
   with a permissive `{type: 'object', additionalProperties: true}` because no
@@ -336,16 +336,16 @@
     JSON Schema as the second argument (use `@valibot/to-json-schema`,
     `@effect/schema/JSONSchema`, or `zod-to-json-schema` respectively).
 
-  Closes [#43](https://github.com/BrainBlend-AI/tesseron/issues/43).
+  Closes [#43](https://github.com/eigenwise/tesseron/issues/43).
 
-- Updated dependencies [[`cf604d0`](https://github.com/BrainBlend-AI/tesseron/commit/cf604d0222519f9ed44fab373279e85f60c69062)]:
+- Updated dependencies [[`cf604d0`](https://github.com/eigenwise/tesseron/commit/cf604d0222519f9ed44fab373279e85f60c69062)]:
   - @tesseron/core@2.2.0
 
 ## 2.1.1
 
 ### Patch Changes
 
-- [#41](https://github.com/BrainBlend-AI/tesseron/pull/41) [`fa3bbdc`](https://github.com/BrainBlend-AI/tesseron/commit/fa3bbdc46a327ac800c7c26fc36f763856f18831) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Fix `tesseron__read_resource` (and `__invoke_action`) hanging indefinitely
+- [#41](https://github.com/eigenwise/tesseron/pull/41) [`fa3bbdc`](https://github.com/eigenwise/tesseron/commit/fa3bbdc46a327ac800c7c26fc36f763856f18831) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Fix `tesseron__read_resource` (and `__invoke_action`) hanging indefinitely
   after an HMR-driven reconnect.
 
   Two interlocking bugs:
@@ -360,21 +360,21 @@
      action invocations to the older — and now dead — session. The lookup
      now picks the most-recently-claimed session matching the `app.id`.
 
-  Closes [#40](https://github.com/BrainBlend-AI/tesseron/issues/40).
+  Closes [#40](https://github.com/eigenwise/tesseron/issues/40).
 
-- Updated dependencies [[`fa3bbdc`](https://github.com/BrainBlend-AI/tesseron/commit/fa3bbdc46a327ac800c7c26fc36f763856f18831)]:
+- Updated dependencies [[`fa3bbdc`](https://github.com/eigenwise/tesseron/commit/fa3bbdc46a327ac800c7c26fc36f763856f18831)]:
   - @tesseron/core@2.1.1
 
 ## 2.1.0
 
 ### Minor Changes
 
-- [#37](https://github.com/BrainBlend-AI/tesseron/pull/37) [`f49f5bf`](https://github.com/BrainBlend-AI/tesseron/commit/f49f5bfcf11904b1c98a2b17c14ec89acbeb824a) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Multi-binding transport layer (PROTOCOL_VERSION → 1.1.0). Decouples the
+- [#37](https://github.com/eigenwise/tesseron/pull/37) [`f49f5bf`](https://github.com/eigenwise/tesseron/commit/f49f5bfcf11904b1c98a2b17c14ec89acbeb824a) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Multi-binding transport layer (PROTOCOL_VERSION → 1.1.0). Decouples the
   protocol from WebSocket so apps that can host other duplex channels — Unix
   domain sockets, future named pipes / stdio — speak Tesseron without bridging
   through a WS server.
 
-  Closes [#28](https://github.com/BrainBlend-AI/tesseron/issues/28), [#29](https://github.com/BrainBlend-AI/tesseron/issues/29), [#30](https://github.com/BrainBlend-AI/tesseron/issues/30), [#31](https://github.com/BrainBlend-AI/tesseron/issues/31), [#32](https://github.com/BrainBlend-AI/tesseron/issues/32), [#33](https://github.com/BrainBlend-AI/tesseron/issues/33), [#34](https://github.com/BrainBlend-AI/tesseron/issues/34).
+  Closes [#28](https://github.com/eigenwise/tesseron/issues/28), [#29](https://github.com/eigenwise/tesseron/issues/29), [#30](https://github.com/eigenwise/tesseron/issues/30), [#31](https://github.com/eigenwise/tesseron/issues/31), [#32](https://github.com/eigenwise/tesseron/issues/32), [#33](https://github.com/eigenwise/tesseron/issues/33), [#34](https://github.com/eigenwise/tesseron/issues/34).
 
   ### Protocol
   - New on-disk discovery format: `~/.tesseron/instances/<instanceId>.json`,
@@ -424,14 +424,14 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`f49f5bf`](https://github.com/BrainBlend-AI/tesseron/commit/f49f5bfcf11904b1c98a2b17c14ec89acbeb824a)]:
+- Updated dependencies [[`f49f5bf`](https://github.com/eigenwise/tesseron/commit/f49f5bfcf11904b1c98a2b17c14ec89acbeb824a)]:
   - @tesseron/core@2.1.0
 
 ## 2.0.0
 
 ### Major Changes
 
-- [#21](https://github.com/BrainBlend-AI/tesseron/pull/21) [`21ce314`](https://github.com/BrainBlend-AI/tesseron/commit/21ce31470232bbdfad3843ed0399ce850302e7a4) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Reversed connection architecture. The gateway is now a pure WebSocket client; apps host their own endpoints and announce themselves via `~/.tesseron/tabs/<tabId>.json`. One discovery mechanism for every runtime, no fixed ports.
+- [#21](https://github.com/eigenwise/tesseron/pull/21) [`21ce314`](https://github.com/eigenwise/tesseron/commit/21ce31470232bbdfad3843ed0399ce850302e7a4) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Reversed connection architecture. The gateway is now a pure WebSocket client; apps host their own endpoints and announce themselves via `~/.tesseron/tabs/<tabId>.json`. One discovery mechanism for every runtime, no fixed ports.
 
   Breaking changes:
   - **`@tesseron/mcp`**: removed `gateway.start()`, `GatewayOptions.port` / `host` / `originAllowlist`, `DEFAULT_GATEWAY_PORT`, `DEFAULT_GATEWAY_HOST`, and the `TESSERON_PORT` / `TESSERON_HOST` / `TESSERON_ORIGIN_ALLOWLIST` environment variables. The CLI now watches `~/.tesseron/tabs/` exclusively.
@@ -448,14 +448,14 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`21ce314`](https://github.com/BrainBlend-AI/tesseron/commit/21ce31470232bbdfad3843ed0399ce850302e7a4)]:
+- Updated dependencies [[`21ce314`](https://github.com/eigenwise/tesseron/commit/21ce31470232bbdfad3843ed0399ce850302e7a4)]:
   - @tesseron/core@2.0.0
 
 ## 1.1.0
 
 ### Minor Changes
 
-- [#4](https://github.com/BrainBlend-AI/tesseron/pull/4) [`97248fb`](https://github.com/BrainBlend-AI/tesseron/commit/97248fbce9f5b0f1e2d065390ccbd50fa92b6ea7) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Add session resume: SDKs can rejoin a previously-claimed session after a
+- [#4](https://github.com/eigenwise/tesseron/pull/4) [`97248fb`](https://github.com/eigenwise/tesseron/commit/97248fbce9f5b0f1e2d065390ccbd50fa92b6ea7) Thanks [@KennyVaneetvelde](https://github.com/KennyVaneetvelde)! - Add session resume: SDKs can rejoin a previously-claimed session after a
   transport drop (tab refresh, network blip, HMR) without going through the
   6-character claim-code dance again.
 
@@ -497,7 +497,7 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`3e8ee2f`](https://github.com/BrainBlend-AI/tesseron/commit/3e8ee2fd431f37c952fff376a3f5bb5202ff870c), [`97248fb`](https://github.com/BrainBlend-AI/tesseron/commit/97248fbce9f5b0f1e2d065390ccbd50fa92b6ea7)]:
+- Updated dependencies [[`3e8ee2f`](https://github.com/eigenwise/tesseron/commit/3e8ee2fd431f37c952fff376a3f5bb5202ff870c), [`97248fb`](https://github.com/eigenwise/tesseron/commit/97248fbce9f5b0f1e2d065390ccbd50fa92b6ea7)]:
   - @tesseron/core@1.1.0
 
 ## 1.0.2
@@ -515,7 +515,7 @@
   now shows the Tesseron logo, a package-specific tagline, install
   command, quick-start code example, what-you-get bullet list, pairing
   guidance, doc links (main repo + SDK reference + protocol spec +
-  examples), license summary, and BrainBlend AI attribution. The previous
+  examples), license summary, and Eigenwise attribution. The previous
   two-line descriptions left visitors landing on npm without enough
   context to know what they were looking at or how to use it.
 

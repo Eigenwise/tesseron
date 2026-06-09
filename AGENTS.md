@@ -34,7 +34,7 @@ repo; do not introduce one.
 - `.claude-plugin/marketplace.json` — Claude Code marketplace listing.
 - `.agents/plugins/marketplace.json` — Codex marketplace listing (same plugin
   source, Codex-preferred path).
-- `docs/` — Starlight site at https://brainblend-ai.github.io/tesseron/.
+- `docs/` — Starlight site at https://eigenwise.github.io/tesseron/.
 - `examples/` — runnable example apps. Treat as live integration fixtures.
 
 ## Plugin manifest is version-coupled

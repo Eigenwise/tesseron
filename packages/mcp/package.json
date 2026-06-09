@@ -6,16 +6,16 @@
   "author": {
     "name": "Kenny Vaneetvelde",
     "email": "kenny.vaneetvelde@gmail.com",
-    "url": "https://brainblendai.com/"
+    "url": "https://eigenwise.io/"
   },
-  "homepage": "https://github.com/BrainBlend-AI/tesseron#readme",
+  "homepage": "https://github.com/eigenwise/tesseron#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/BrainBlend-AI/tesseron.git",
+    "url": "git+https://github.com/eigenwise/tesseron.git",
     "directory": "packages/mcp"
   },
   "bugs": {
-    "url": "https://github.com/BrainBlend-AI/tesseron/issues"
+    "url": "https://github.com/eigenwise/tesseron/issues"
   },
   "keywords": [
     "mcp",
