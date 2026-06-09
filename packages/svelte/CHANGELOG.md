@@ -1,5 +1,13 @@
 # @tesseron/svelte
 
+## 2.10.1
+
+### Patch Changes
+
+- Updated dependencies [[`1fc880b`](https://github.com/Eigenwise/tesseron/commit/1fc880b60308d58e21b0bb2e9288a375da1f2fe4)]:
+  - @tesseron/core@2.10.1
+  - @tesseron/web@2.10.1
+
 ## 2.10.0
 
 ### Minor Changes
