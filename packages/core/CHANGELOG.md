@@ -1,5 +1,11 @@
 # @tesseron/core
 
+## 2.10.1
+
+### Patch Changes
+
+- [`1fc880b`](https://github.com/Eigenwise/tesseron/commit/1fc880b60308d58e21b0bb2e9288a375da1f2fe4) by @Eigenwise - Repository moved to github.com/eigenwise/tesseron (rebrand from BrainBlend-AI, same maintainer). Updates package metadata (repository URL, homepage) and README branding. No runtime behavior changes.
+
 ## 2.10.0
 
 ### Minor Changes
