@@ -34,6 +34,34 @@ async function pypiLatest(projectName) {
   return { version, publishedAt: new Date(body.releases[version][0].upload_time_iso_8601) };
 }
 
+async function githubText(url) {
+  const response = await fetch(url, { headers: { 'User-Agent': userAgent } });
+  if (!response.ok) throw new Error(`${url} -> HTTP ${response.status}`);
+  return response.text();
+}
+
+// The pin an SDK repository runs its conformance suite against, as written on
+// its main branch: every `@tesseron/conformance@x.y.z` in CONTRIBUTING.md and
+// under .github/workflows. Read from GitHub so the check sees what CI runs,
+// not whatever a local clone happens to have pulled.
+async function conformancePinsOnMain(repository) {
+  const rawRoot = `https://raw.githubusercontent.com/${repository}/main`;
+  const workflows = await getJson(
+    `https://api.github.com/repos/${repository}/contents/.github/workflows`,
+  ).catch(() => []);
+  const sources = [
+    `${rawRoot}/CONTRIBUTING.md`,
+    ...workflows.filter((entry) => /\.ya?ml$/.test(entry.name)).map((entry) => entry.download_url),
+  ];
+  const pins = new Set();
+  for (const url of sources) {
+    const text = await githubText(url).catch(() => '');
+    for (const match of text.matchAll(/@tesseron\/conformance@(\d+\.\d+\.\d+)/g))
+      pins.add(match[1]);
+  }
+  return [...pins].sort();
+}
+
 async function githubLatestTag(repository) {
   const tags = await getJson(`https://api.github.com/repos/${repository}/tags?per_page=1`);
   if (tags.length === 0) return null;
@@ -55,10 +83,30 @@ function hubDocsLastTouched(relativeDirectory) {
 }
 
 const sdkReleases = [
-  { language: 'typescript', docs: 'sdk/typescript', latest: () => npmLatest('@tesseron/core') },
-  { language: 'rust', docs: 'sdk/rust', latest: () => cratesLatest('tesseron') },
-  { language: 'python', docs: 'sdk/python', latest: () => pypiLatest('tesseron') },
-  { language: 'cpp', docs: 'sdk/cpp', latest: () => githubLatestTag('Eigenwise/tesseron-cpp') },
+  {
+    language: 'typescript',
+    repository: 'Eigenwise/tesseron-typescript',
+    docs: 'sdk/typescript',
+    latest: () => npmLatest('@tesseron/core'),
+  },
+  {
+    language: 'rust',
+    repository: 'Eigenwise/tesseron-rust',
+    docs: 'sdk/rust',
+    latest: () => cratesLatest('tesseron'),
+  },
+  {
+    language: 'python',
+    repository: 'Eigenwise/tesseron-python',
+    docs: 'sdk/python',
+    latest: () => pypiLatest('tesseron'),
+  },
+  {
+    language: 'cpp',
+    repository: 'Eigenwise/tesseron-cpp',
+    docs: 'sdk/cpp',
+    latest: () => githubLatestTag('Eigenwise/tesseron-cpp'),
+  },
 ];
 
 function* docsFiles(directory) {
@@ -126,6 +174,26 @@ for (const pin of pinnedPackages()) {
   ]);
 }
 
+const conformanceLatest = await npmLatest('@tesseron/conformance');
+const conformanceRows = [];
+for (const sdk of sdkReleases) {
+  const pins = await conformancePinsOnMain(sdk.repository);
+  const behind = pins.some((pin) => pin !== conformanceLatest.version);
+  const verdict =
+    pins.length === 0
+      ? 'DRIFT: no conformance run on main'
+      : behind
+        ? 'DRIFT: SDK runs an older corpus'
+        : 'ok';
+  if (verdict !== 'ok') drift += 1;
+  conformanceRows.push([
+    sdk.language,
+    pins.length === 0 ? '-' : pins.join(', '),
+    conformanceLatest.version,
+    verdict,
+  ]);
+}
+
 function printTable(header, table) {
   const widths = header.map((_, column) =>
     Math.max(header[column].length, ...table.map((row) => String(row[column]).length)),
@@ -138,6 +206,10 @@ function printTable(header, table) {
 
 printTable(['sdk', 'released', 'published at', 'hub docs last touched', 'verdict'], rows);
 if (pinRows.length > 0) printTable(['docs pin', 'pinned', 'registry latest', 'verdict'], pinRows);
+printTable(
+  ['sdk', '@tesseron/conformance pinned on main', 'registry latest', 'verdict'],
+  conformanceRows,
+);
 console.log(drift === 0 ? 'docs-drift: no drift found.' : `docs-drift: ${drift} drift finding(s).`);
 console.log(
   'Checks version and date drift only; prose that fails to mention a release is not detected.',

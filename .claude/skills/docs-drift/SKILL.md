@@ -25,6 +25,13 @@ gap between merging docs and the tag-triggered publish landing on the registry.
 prose pins ("default since `@tesseron/mcp@2.4.0`") are history and are skipped on purpose.
 `scripts/sync-plugin-version.mjs` owns the pin on `sdk/typescript/mcp.md`; every other docs pin drifts on its own.
 
+**Conformance pin table.** One row per language: every `@tesseron/conformance@x.y.z` found on the SDK
+repo's `main` in `CONTRIBUTING.md` and `.github/workflows/*.yml`, compared with npm latest. A pin behind the
+registry is `DRIFT: SDK runs an older corpus`; no pin at all is `DRIFT: no conformance run on main`, which is
+the worse finding, because that SDK is not validated against the protocol anywhere (the TypeScript repo
+shipped that way for a day after the split). It reads GitHub, not the local clones, so an unpushed pin bump
+still reports as drift until it lands on `main`.
+
 **Blind spot.** It measures dates and version strings only. A docs commit that lands after a release but
 says nothing about it counts as ok. Prose drift still needs `update-docs`.
 
